@@ -1,5 +1,5 @@
 import { ArrowDownRight, ArrowUpRight, MinusCircle, Target, ShieldAlert, Crosshair } from "lucide-react";
-import type { SignalResult } from "@/lib/signal.server";
+import type { SignalResult } from "@/lib/signal-types";
 import { PriceChart } from "./PriceChart";
 import { fmtPct, fmtPrice } from "./format";
 import { cn } from "@/lib/utils";
