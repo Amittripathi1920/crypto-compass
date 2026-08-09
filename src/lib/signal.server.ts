@@ -17,10 +17,12 @@ Respond with ONLY a JSON object with these keys:
 Reference concrete numbers in each reasoning detail. Keep each detail under 300 characters.`;
 
 export async function generateSignal(req: SignalRequest): Promise<SignalResult> {
-  const [candles, ticker] = await Promise.all([
+  const [candlesRes, tickerRes] = await Promise.all([
     fetchCandles(req.symbol, req.timeframe),
     fetchTicker(req.symbol),
   ]);
+  const candles = candlesRes.value;
+  const ticker = tickerRes.value;
 
   const ind = computeIndicators(candles);
   const price = ticker.price || ind.price;
@@ -142,6 +144,11 @@ export async function generateSignal(req: SignalRequest): Promise<SignalResult> 
     timeframe: req.timeframe,
     generatedAt: new Date().toISOString(),
     modelUsed: `${provider.label} · ${model}`,
+    dataSource: {
+      candles: candlesRes.source,
+      ticker: tickerRes.source,
+      attempts: [...candlesRes.attempts, ...tickerRes.attempts],
+    },
     currentPrice: price,
     change24hPct: ticker.change24hPct,
     high24h: ticker.high24h,
