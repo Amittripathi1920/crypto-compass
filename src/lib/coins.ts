@@ -28,6 +28,7 @@ export const COINS = [
   { symbol: "UNI", name: "Uniswap" },
   { symbol: "APT", name: "Aptos" },
   { symbol: "ICP", name: "Internet Computer" },
+  { symbol: "APT", name: "Aptos" },
   { symbol: "ATOM", name: "Cosmos" },
 ] as const;
 
