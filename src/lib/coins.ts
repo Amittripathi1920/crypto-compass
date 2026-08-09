@@ -20,7 +20,7 @@ export const COINS = [
   { symbol: "TON", name: "Toncoin" },
   { symbol: "TRX", name: "TRON" },
   { symbol: "DOT", name: "Polkadot" },
-  { symbol: "MATIC", name: "Polygon" },
+  { symbol: "POL", name: "Polygon" },
   { symbol: "LTC", name: "Litecoin" },
   { symbol: "HYPE", name: "Hyperliquid" },
   { symbol: "BCH", name: "Bitcoin Cash" },
