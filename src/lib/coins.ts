@@ -22,6 +22,7 @@ export const COINS = [
   { symbol: "DOT", name: "Polkadot" },
   { symbol: "MATIC", name: "Polygon" },
   { symbol: "LTC", name: "Litecoin" },
+  { symbol: "HYPE", name: "Hyperliquid" },
   { symbol: "BCH", name: "Bitcoin Cash" },
   { symbol: "NEAR", name: "NEAR Protocol" },
   { symbol: "UNI", name: "Uniswap" },
