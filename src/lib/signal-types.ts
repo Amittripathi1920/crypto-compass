@@ -14,6 +14,11 @@ export type SignalResult = {
   timeframe: Timeframe;
   generatedAt: string;
   modelUsed: string;
+  dataSource: {
+    candles: string;
+    ticker: string;
+    attempts: { exchange: string; ok: boolean; ms: number; error?: string }[];
+  };
   currentPrice: number;
   change24hPct: number;
   high24h: number;

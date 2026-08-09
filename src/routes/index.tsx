@@ -1,7 +1,7 @@
 import { createFileRoute } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
-import { useMemo, useState } from "react";
+import { useEffect, useMemo, useState } from "react";
 import { Activity, KeyRound, Loader2, Sparkles, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
@@ -18,6 +18,7 @@ import { Skeleton } from "@/components/ui/skeleton";
 import { COINS, PROVIDERS, TIMEFRAMES, providerById, type ProviderId, type Timeframe } from "@/lib/coins";
 import { analyzeCoin } from "@/lib/signal.functions";
 import { SignalReport } from "@/components/signal/SignalReport";
+import { ExchangeStatus } from "@/components/signal/ExchangeStatus";
 import { cn } from "@/lib/utils";
 
 export const Route = createFileRoute("/")({
@@ -48,6 +49,9 @@ function Index() {
   const [provider, setProvider] = useState<ProviderId>("lovable");
   const [model, setModel] = useState<string>(PROVIDERS[0]!.defaultModel);
   const [apiKey, setApiKey] = useState<string>("");
+  const [lastSuccess, setLastSuccess] = useState<
+    { at: string; symbol: string; timeframe: Timeframe; source: string } | null
+  >(null);
 
   const activeProvider = useMemo(() => providerById(provider), [provider]);
   const analyze = useServerFn(analyzeCoin);
@@ -68,6 +72,18 @@ function Index() {
   const keyMissing = activeProvider.needsKey && apiKey.trim().length === 0;
   const errorMessage =
     mutation.error instanceof Error ? mutation.error.message : mutation.error ? "Analysis failed." : "";
+  const [errorHeadline, ...errorDetails] = errorMessage.split("\n");
+
+  useEffect(() => {
+    if (mutation.data) {
+      setLastSuccess({
+        at: mutation.data.generatedAt,
+        symbol: mutation.data.symbol,
+        timeframe: mutation.data.timeframe,
+        source: mutation.data.dataSource.candles,
+      });
+    }
+  }, [mutation.data]);
 
   return (
     <main className="min-h-screen bg-background">
@@ -227,9 +243,36 @@ function Index() {
         </section>
 
         {errorMessage ? (
-          <div className="flex items-start gap-2 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
-            <TriangleAlert className="mt-0.5 h-4 w-4 text-destructive" />
-            <p className="text-sm text-foreground">{errorMessage}</p>
+          <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
+            <div className="flex items-start gap-2">
+              <TriangleAlert className="mt-0.5 h-4 w-4 shrink-0 text-destructive" />
+              <div className="min-w-0">
+                <p className="text-sm font-medium text-foreground">{errorHeadline}</p>
+                <p className="mt-1 text-[11px] text-muted-foreground">
+                  {lastSuccess
+                    ? `Last successful analysis: ${lastSuccess.symbol} · ${lastSuccess.timeframe} via ${lastSuccess.source} at ${new Date(lastSuccess.at).toLocaleString()}`
+                    : "No successful analysis yet in this session."}
+                </p>
+              </div>
+            </div>
+
+            {errorDetails.length > 0 ? (
+              <div className="rounded-lg border border-border bg-background/60 p-3">
+                <p className="text-[10px] font-semibold uppercase tracking-widest text-muted-foreground">
+                  Market data attempts
+                </p>
+                <pre className="tabular mt-1.5 overflow-x-auto whitespace-pre-wrap break-words text-[11px] leading-relaxed text-foreground/90">
+                  {errorDetails.join("\n")}
+                </pre>
+              </div>
+            ) : null}
+
+            <ExchangeStatus
+              attempts={errorDetails.flatMap((linked) => {
+                const m = /^(OKX|Binance|Kraken) \((\d+)ms\): (.*)$/.exec(linked.trim());
+                return m ? [{ exchange: m[1]!, ok: false, ms: Number(m[2]), error: m[3]! }] : [];
+              })}
+            />
           </div>
         ) : null}
 

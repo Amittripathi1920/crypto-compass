@@ -137,31 +137,65 @@ function tickerFromCandles(candles: Candle[]): Ticker {
   };
 }
 
-async function firstOk<T>(label: string, tasks: Array<() => Promise<T>>): Promise<T> {
-  const errors: string[] = [];
+export type ExchangeId = "OKX" | "Binance" | "Kraken";
+
+export type ExchangeAttempt = {
+  exchange: ExchangeId;
+  ok: boolean;
+  ms: number;
+  error?: string;
+};
+
+export type Sourced<T> = {
+  value: T;
+  source: ExchangeId;
+  attempts: ExchangeAttempt[];
+};
+
+async function firstOk<T>(
+  label: string,
+  tasks: Array<{ exchange: ExchangeId; run: () => Promise<T> }>,
+): Promise<Sourced<T>> {
+  const attempts: ExchangeAttempt[] = [];
   for (const task of tasks) {
+    const started = Date.now();
     try {
-      return await task();
+      const value = await task.run();
+      attempts.push({ exchange: task.exchange, ok: true, ms: Date.now() - started });
+      return { value, source: task.exchange, attempts };
     } catch (err) {
-      errors.push(err instanceof Error ? err.message : String(err));
+      attempts.push({
+        exchange: task.exchange,
+        ok: false,
+        ms: Date.now() - started,
+        error: err instanceof Error ? err.message : String(err),
+      });
     }
   }
-  console.error(`[market] ${label} failed:`, errors.join(" | "));
-  throw new Error(`Market data unavailable for ${label} (${errors[0] ?? "unknown error"})`);
+  const detail = attempts
+    .map((a) => `${a.exchange} (${a.ms}ms): ${a.error ?? "unknown error"}`)
+    .join("\n");
+  console.error(`[market] ${label} failed:\n${detail}`);
+  const error = new Error(`Market data unavailable for ${label}.\n${detail}`);
+  (error as Error & { attempts?: ExchangeAttempt[] }).attempts = attempts;
+  throw error;
 }
 
-export async function fetchCandles(symbol: string, interval: Timeframe): Promise<Candle[]> {
+export async function fetchCandles(
+  symbol: string,
+  interval: Timeframe,
+): Promise<Sourced<Candle[]>> {
   return firstOk(`${symbol} ${interval} candles`, [
-    () => okxCandles(symbol, interval),
-    () => binanceCandles(symbol, interval),
-    () => krakenCandles(symbol, interval),
+    { exchange: "OKX", run: () => okxCandles(symbol, interval) },
+    { exchange: "Binance", run: () => binanceCandles(symbol, interval) },
+    { exchange: "Kraken", run: () => krakenCandles(symbol, interval) },
   ]);
 }
 
-export async function fetchTicker(symbol: string): Promise<Ticker> {
+export async function fetchTicker(symbol: string): Promise<Sourced<Ticker>> {
   return firstOk(`${symbol} ticker`, [
-    () => okxTicker(symbol),
-    () => binanceTicker(symbol),
-    async () => tickerFromCandles(await krakenCandles(symbol, "1h")),
+    { exchange: "OKX", run: () => okxTicker(symbol) },
+    { exchange: "Binance", run: () => binanceTicker(symbol) },
+    { exchange: "Kraken", run: async () => tickerFromCandles(await krakenCandles(symbol, "1h")) },
   ]);
 }

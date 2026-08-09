@@ -34,5 +34,6 @@ export const getLivePrice = createServerFn({ method: "POST" })
   )
   .handler(async ({ data }) => {
     const { fetchTicker } = await import("./market.server");
-    return fetchTicker(data.symbol);
+    const res = await fetchTicker(data.symbol);
+    return { ...res.value, source: res.source };
   });

@@ -1,6 +1,7 @@
 import { ArrowDownRight, ArrowUpRight, MinusCircle, Target, ShieldAlert, Crosshair } from "lucide-react";
 import type { SignalResult } from "@/lib/signal-types";
 import { PriceChart } from "./PriceChart";
+import { ExchangeStatus } from "./ExchangeStatus";
 import { fmtPct, fmtPrice } from "./format";
 import { cn } from "@/lib/utils";
 
@@ -128,6 +129,12 @@ export function SignalReport({ result }: { result: SignalResult }) {
           { label: "T1", value: result.target1, color: "var(--bull)" },
           { label: "T2", value: result.target2, color: "var(--bull)" },
         ]}
+      />
+
+      <ExchangeStatus
+        attempts={result.dataSource.attempts}
+        candleSource={result.dataSource.candles}
+        tickerSource={result.dataSource.ticker}
       />
 
       <section className="rounded-xl border border-border bg-card/50 p-5">
