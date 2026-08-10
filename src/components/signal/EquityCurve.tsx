@@ -30,12 +30,12 @@ export function EquityCurve({
           <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
             <stop
               offset="0%"
-              stopColor={positive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+              stopColor={positive ? "var(--primary)" : "var(--destructive)"}
               stopOpacity="0.28"
             />
             <stop
               offset="100%"
-              stopColor={positive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+              stopColor={positive ? "var(--primary)" : "var(--destructive)"}
               stopOpacity="0"
             />
           </linearGradient>
@@ -48,7 +48,7 @@ export function EquityCurve({
               x2={w - pad.right}
               y1={y(v)}
               y2={y(v)}
-              stroke="hsl(var(--border))"
+              stroke="var(--border)"
               strokeDasharray="3 4"
             />
             <text
@@ -68,7 +68,7 @@ export function EquityCurve({
             x2={w - pad.right}
             y1={y(0)}
             y2={y(0)}
-            stroke="hsl(var(--muted-foreground))"
+            stroke="var(--muted-foreground)"
             strokeOpacity="0.6"
           />
         ) : null}
@@ -78,13 +78,13 @@ export function EquityCurve({
           d={line}
           fill="none"
           strokeWidth="2"
-          stroke={positive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+          stroke={positive ? "var(--primary)" : "var(--destructive)"}
         />
         <circle
           cx={x(values.length - 1)}
           cy={y(last)}
           r="3.5"
-          fill={positive ? "hsl(var(--primary))" : "hsl(var(--destructive))"}
+          fill={positive ? "var(--primary)" : "var(--destructive)"}
         />
       </svg>
       <div className="mt-1 flex justify-between font-mono text-[10px] text-muted-foreground">
