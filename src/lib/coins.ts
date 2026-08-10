@@ -1,10 +1,10 @@
-export type Timeframe = "15m" | "1h" | "4h" | "1d";
+export type Timeframe = "4h" | "8h" | "1d" | "1w";
 
 export const TIMEFRAMES: { value: Timeframe; label: string; horizon: string }[] = [
-  { value: "15m", label: "15m", horizon: "intraday scalp (hours)" },
-  { value: "1h", label: "1H", horizon: "intraday (1-2 days)" },
   { value: "4h", label: "4H", horizon: "swing (3-7 days)" },
+  { value: "8h", label: "8H", horizon: "extended swing (5-10 days)" },
   { value: "1d", label: "1D", horizon: "position (2-6 weeks)" },
+  { value: "1w", label: "1W", horizon: "long term macro (2-6 months)" },
 ];
 
 export const COINS = [
@@ -79,7 +79,17 @@ export const PROVIDERS: {
     label: "Groq",
     needsKey: true,
     defaultModel: "llama-3.3-70b-versatile",
-    models: ["llama-3.3-70b-versatile", "deepseek-r1-distill-llama-70b"],
+    models: [
+      "llama-3.3-70b-versatile",
+      "llama-3.3-70b-specdec",
+      "llama-3.1-8b-instant",
+      "llama-3.1-70b-versatile",
+      "llama3-70b-8192",
+      "llama3-8b-8192",
+      "mixtral-8x7b-32768",
+      "gemma2-9b-it",
+      "deepseek-r1-distill-llama-70b"
+    ],
     keyHint: "gsk_... from console.groq.com",
   },
 ];

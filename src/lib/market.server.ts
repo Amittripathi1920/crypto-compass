@@ -18,7 +18,7 @@ async function getJson(url: string): Promise<unknown> {
 const num = (v: unknown) => Number(v);
 
 /* ---------------- OKX ---------------- */
-const OKX_BAR: Record<Timeframe, string> = { "15m": "15m", "1h": "1H", "4h": "4H", "1d": "1D" };
+const OKX_BAR: Record<Timeframe, string> = { "4h": "4H", "8h": "8H", "1d": "1D", "1w": "1W" };
 
 async function okxCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
   const json = (await getJson(
@@ -100,10 +100,10 @@ async function binanceTicker(symbol: string): Promise<Ticker> {
 }
 
 /* ---------------- Kraken ---------------- */
-const KRAKEN_INTERVAL: Record<Timeframe, number> = { "15m": 15, "1h": 60, "4h": 240, "1d": 1440 };
+const KRAKEN_INTERVAL: Record<Timeframe | "1h", number> = { "4h": 240, "8h": 480, "1d": 1440, "1w": 10080, "1h": 60 };
 const krakenAsset = (s: string) => (s === "BTC" ? "XBT" : s === "DOGE" ? "XDG" : s);
 
-async function krakenCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
+async function krakenCandles(symbol: string, tf: Timeframe | "1h"): Promise<Candle[]> {
   const json = (await getJson(
     `https://api.kraken.com/0/public/OHLC?pair=${krakenAsset(symbol)}USDT&interval=${KRAKEN_INTERVAL[tf]}`,
   )) as { error?: string[]; result?: Record<string, unknown> };
@@ -199,3 +199,62 @@ export async function fetchTicker(symbol: string): Promise<Sourced<Ticker>> {
     { exchange: "Kraken", run: async () => tickerFromCandles(await krakenCandles(symbol, "1h")) },
   ]);
 }
+
+export type SentimentData = {
+  value: number;
+  sentiment: string;
+};
+
+export async function fetchFearAndGreed(): Promise<SentimentData | null> {
+  try {
+    // Timeout of 3 seconds using AbortSignal
+    const res = await fetch("https://api.alternative.me/fng/?limit=1", {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      data?: { value: string; value_classification: string }[];
+    };
+    const first = json.data?.[0];
+    if (!first) return null;
+    return {
+      value: Number(first.value),
+      sentiment: first.value_classification,
+    };
+  } catch (err) {
+    console.warn("[market] Failed to fetch Fear & Greed Index:", err);
+    return null;
+  }
+}
+
+export type GlobalMetrics = {
+  btcDominance: number;
+  ethDominance: number;
+};
+
+export async function fetchGlobalCryptoMetrics(): Promise<GlobalMetrics | null> {
+  try {
+    const res = await fetch("https://api.coingecko.com/api/v3/global", {
+      signal: AbortSignal.timeout(3000),
+    });
+    if (!res.ok) return null;
+    const json = (await res.json()) as {
+      data?: {
+        market_cap_percentage?: {
+          btc?: number;
+          eth?: number;
+        };
+      };
+    };
+    const caps = json.data?.market_cap_percentage;
+    if (!caps || typeof caps.btc !== "number") return null;
+    return {
+      btcDominance: caps.btc,
+      ethDominance: caps.eth ?? 0,
+    };
+  } catch (err) {
+    console.warn("[market] Failed to fetch Global Crypto Metrics:", err);
+    return null;
+  }
+}
+

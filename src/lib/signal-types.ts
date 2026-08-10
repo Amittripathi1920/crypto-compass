@@ -23,6 +23,8 @@ export type SignalResult = {
   change24hPct: number;
   high24h: number;
   low24h: number;
+  marketRegime: string;
+  sentiment?: { value: number; label: string } | null;
   direction: "LONG" | "SHORT" | "NO TRADE";
   confidence: number;
   entry: number;

@@ -7,7 +7,7 @@ const InputSchema = z.object({
     .min(2)
     .max(10)
     .regex(/^[A-Z0-9]+$/),
-  timeframe: z.enum(["15m", "1h", "4h", "1d"]),
+  timeframe: z.enum(["4h", "8h", "1d", "1w"]),
   provider: z.enum(["lovable", "openai", "anthropic", "google", "groq"]),
   model: z.string().max(80).optional(),
   apiKey: z.string().max(300).optional(),

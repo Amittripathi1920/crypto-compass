@@ -149,3 +149,202 @@ export function roundToTick(value: number, reference: number): number {
   const decimals = reference >= 1000 ? 2 : reference >= 10 ? 3 : reference >= 1 ? 4 : 6;
   return Number(value.toFixed(decimals));
 }
+
+export function determineRegime(ind: {
+  ema20: number;
+  ema50: number;
+  ema200: number;
+  trend: string;
+  volume: { label: string; ratio: number };
+}): string {
+  const volLabel = ind.volume.label;
+  const isEmaStackBull = ind.ema20 > ind.ema50 && ind.ema50 > ind.ema200;
+  const isEmaStackBear = ind.ema20 < ind.ema50 && ind.ema50 < ind.ema200;
+
+  if (isEmaStackBull && volLabel === "expanding") {
+    return "Trending Bullish";
+  }
+  if (isEmaStackBear && volLabel === "expanding") {
+    return "Trending Bearish";
+  }
+  if (volLabel === "contracting" || ind.volume.ratio < 0.85) {
+    return "Compressing Range";
+  }
+  if (ind.trend === "short-term bullish") {
+    return "Bullish Bias (Range)";
+  }
+  if (ind.trend === "short-term bearish") {
+    return "Bearish Bias (Range)";
+  }
+  return "Choppy Range";
+}
+
+export type ConfluenceResult = {
+  entry: number;
+  stopLoss: number;
+  target1: number;
+  target2: number;
+  confluenceReason: string;
+};
+
+export function findSweetSpot(
+  ind: {
+    ema20: number;
+    ema50: number;
+    swingHigh: number;
+    swingLow: number;
+  },
+  price: number,
+  atr: number,
+  isLong: boolean
+): ConfluenceResult {
+  const fib50 = ind.swingHigh - 0.5 * (ind.swingHigh - ind.swingLow);
+  const fib618 = ind.swingHigh - 0.618 * (ind.swingHigh - ind.swingLow);
+
+  let entry = price;
+  let stopLoss = isLong ? price - 1.5 * atr : price + 1.5 * atr;
+  let target1 = isLong ? price + 2.5 * atr : price - 2.5 * atr;
+  let target2 = isLong ? price + 4.0 * atr : price - 4.0 * atr;
+  let confluenceReason = "Single Level Pivot (No High Confluence)";
+
+  if (isLong) {
+    // We want to buy at support below current spot price
+    const levels = [
+      { name: "EMA20", val: ind.ema20 },
+      { name: "EMA50", val: ind.ema50 },
+      { name: "Fib 50%", val: fib50 },
+      { name: "Fib 61.8%", val: fib618 },
+      { name: "Swing Low Support", val: ind.swingLow },
+    ].filter((l) => l.val > 0 && l.val < price);
+
+    // Sort descending (highest support closest to current price first)
+    levels.sort((a, b) => b.val - a.val);
+
+    // Find the tightest cluster of 2 levels within 1.0% of each other
+    let foundCluster = false;
+    for (let i = 0; i < levels.length - 1; i++) {
+      const topLevel = levels[i]!;
+      const bottomLevel = levels[i + 1]!;
+      if ((topLevel.val - bottomLevel.val) / topLevel.val <= 0.01) {
+        // Confluence Zone Found!
+        entry = topLevel.val;
+        stopLoss = bottomLevel.val - 0.15 * atr;
+        confluenceReason = `Confluence Sweet Spot [${topLevel.name} + ${bottomLevel.name}]`;
+        foundCluster = true;
+        break;
+      }
+    }
+
+    // Default structural fallback if no cluster is found
+    if (!foundCluster && levels.length > 0) {
+      entry = levels[0]!.val; // Buy at the nearest major support
+      stopLoss = entry - 1.5 * atr;
+    }
+
+    // Ensure stop-loss doesn't exceed 3.5% (to preserve R:R) and is at least 0.5%
+    const maxStopDist = price * 0.035;
+    const minStopDist = price * 0.005;
+    const currentStopDist = price - stopLoss;
+    if (currentStopDist > maxStopDist) {
+      stopLoss = price - maxStopDist;
+    } else if (currentStopDist < minStopDist) {
+      stopLoss = price - minStopDist;
+    }
+
+    // High-probability take profits
+    // Target 1: Local Swing High - 0.1 * ATR (guarantees exit before major resistance wicks)
+    target1 = ind.swingHigh > price
+      ? ind.swingHigh - 0.1 * atr
+      : price + 2.0 * atr;
+
+    // Target 2: Strict 3.0x Risk multiple from Entry
+    const risk = entry - stopLoss;
+    target2 = entry + 3.0 * risk;
+  } else {
+    // Short: We want to sell at resistance above current spot price
+    const levels = [
+      { name: "EMA20", val: ind.ema20 },
+      { name: "EMA50", val: ind.ema50 },
+      { name: "Fib 50%", val: fib50 },
+      { name: "Fib 61.8%", val: fib618 },
+      { name: "Swing High Resistance", val: ind.swingHigh },
+    ].filter((l) => l.val > price);
+
+    // Sort ascending (lowest resistance closest to current price first)
+    levels.sort((a, b) => a.val - b.val);
+
+    // Find the tightest cluster of 2 levels within 1.0% of each other
+    let foundCluster = false;
+    for (let i = 0; i < levels.length - 1; i++) {
+      const bottomLevel = levels[i]!;
+      const topLevel = levels[i + 1]!;
+      if ((topLevel.val - bottomLevel.val) / bottomLevel.val <= 0.01) {
+        // Confluence Zone Found!
+        entry = bottomLevel.val;
+        stopLoss = topLevel.val + 0.15 * atr;
+        confluenceReason = `Confluence Sweet Spot [${bottomLevel.name} + ${topLevel.name}]`;
+        foundCluster = true;
+        break;
+      }
+    }
+
+    // Default structural fallback if no cluster is found
+    if (!foundCluster && levels.length > 0) {
+      entry = levels[0]!.val; // Short at the nearest major resistance
+      stopLoss = entry + 1.5 * atr;
+    }
+
+    // Ensure stop-loss boundaries
+    const maxStopDist = price * 0.035;
+    const minStopDist = price * 0.005;
+    const currentStopDist = stopLoss - price;
+    if (currentStopDist > maxStopDist) {
+      stopLoss = price + maxStopDist;
+    } else if (currentStopDist < minStopDist) {
+      stopLoss = price + minStopDist;
+    }
+
+    // High-probability take profits
+    // Target 1: Local Swing Low + 0.1 * ATR (guarantees exit before major support wicks)
+    target1 = ind.swingLow > 0 && ind.swingLow < price
+      ? ind.swingLow + 0.1 * atr
+      : price - 2.0 * atr;
+
+    // Target 2: Strict 3.0x Risk multiple
+    const risk = stopLoss - entry;
+    target2 = entry - 3.0 * risk;
+  }
+
+  return { entry, stopLoss, target1, target2, confluenceReason };
+}
+
+export function rsiSeries(closes: number[], period = 14): number[] {
+  const result: number[] = new Array(closes.length).fill(50);
+  if (closes.length <= period) return result;
+
+  let gain = 0;
+  let loss = 0;
+  for (let i = 1; i <= period; i++) {
+    const d = closes[i]! - closes[i - 1]!;
+    if (d >= 0) gain += d;
+    else loss -= d;
+  }
+  let avgGain = gain / period;
+  let avgLoss = loss / period;
+  result[period] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+
+  for (let i = period + 1; i < closes.length; i++) {
+    const d = closes[i]! - closes[i - 1]!;
+    avgGain = (avgGain * (period - 1) + Math.max(d, 0)) / period;
+    avgLoss = (avgLoss * (period - 1) + Math.max(-d, 0)) / period;
+    result[i] = avgLoss === 0 ? 100 : 100 - 100 / (1 + avgGain / avgLoss);
+  }
+
+  const firstVal = result[period]!;
+  for (let i = 0; i < period; i++) {
+    result[i] = firstVal;
+  }
+
+  return result;
+}
+
