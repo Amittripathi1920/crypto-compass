@@ -282,3 +282,12 @@ export async function generateSignal(req: SignalRequest): Promise<SignalResult> 
     candles: candles.slice(-80),
   };
 }
+
+export async function generatePatternAnalysis(symbol: string, timeframe: string) {
+  const { fetchCandles } = await import("./market.server");
+  const { detectPatterns } = await import("./patterns");
+  const res = await fetchCandles(symbol, timeframe as any);
+  const candles = res.value;
+  const patterns = detectPatterns(candles);
+  return { candles, patterns };
+}

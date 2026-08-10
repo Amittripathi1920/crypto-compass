@@ -37,3 +37,21 @@ export const getLivePrice = createServerFn({ method: "POST" })
     const res = await fetchTicker(data.symbol);
     return { ...res.value, source: res.source };
   });
+
+export const getPatternAnalysis = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        symbol: z
+          .string()
+          .min(2)
+          .max(10)
+          .regex(/^[A-Z0-9]+$/),
+        timeframe: z.enum(["4h", "8h", "1d", "1w"]),
+      })
+      .parse(input)
+  )
+  .handler(async ({ data }) => {
+    const { generatePatternAnalysis } = await import("./signal.server");
+    return generatePatternAnalysis(data.symbol, data.timeframe);
+  });

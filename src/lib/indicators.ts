@@ -220,13 +220,13 @@ export function findSweetSpot(
     // Sort descending (highest support closest to current price first)
     levels.sort((a, b) => b.val - a.val);
 
-    // Find the tightest cluster of 2 levels within 1.0% of each other
+    // Find the tightest cluster of 2 levels within 1.0% of each other (Confluence)
     let foundCluster = false;
     for (let i = 0; i < levels.length - 1; i++) {
       const topLevel = levels[i]!;
       const bottomLevel = levels[i + 1]!;
       if ((topLevel.val - bottomLevel.val) / topLevel.val <= 0.01) {
-        // Confluence Zone Found!
+        // Confluence Zone Found! Entry on 1st support, SL below 2nd support
         entry = topLevel.val;
         stopLoss = bottomLevel.val - 0.15 * atr;
         confluenceReason = `Confluence Sweet Spot [${topLevel.name} + ${bottomLevel.name}]`;
@@ -236,26 +236,38 @@ export function findSweetSpot(
     }
 
     // Default structural fallback if no cluster is found
-    if (!foundCluster && levels.length > 0) {
-      entry = levels[0]!.val; // Buy at the nearest major support
-      stopLoss = entry - 1.5 * atr;
+    if (!foundCluster) {
+      if (levels.length >= 2) {
+        // Take entry on 1st support, SL below 2nd support
+        entry = levels[0]!.val;
+        stopLoss = levels[1]!.val - 0.15 * atr;
+        confluenceReason = `Multi-Support Structure [Entry: ${levels[0]!.name} / SL: ${levels[1]!.name}]`;
+      } else if (levels.length === 1) {
+        entry = levels[0]!.val;
+        stopLoss = entry - 1.5 * atr;
+        confluenceReason = `Single Level Support [${levels[0]!.name}]`;
+      } else {
+        entry = price;
+        stopLoss = entry - 1.5 * atr;
+        confluenceReason = "No Support Levels (Pivot Fallback)";
+      }
     }
 
-    // Ensure stop-loss doesn't exceed 3.5% (to preserve R:R) and is at least 0.5%
-    const maxStopDist = price * 0.035;
-    const minStopDist = price * 0.005;
-    const currentStopDist = price - stopLoss;
+    // Clamp stop-loss relative to entry price (min 0.5%, max 3.5%) to manage risk
+    const maxStopDist = entry * 0.035;
+    const minStopDist = entry * 0.005;
+    const currentStopDist = entry - stopLoss;
     if (currentStopDist > maxStopDist) {
-      stopLoss = price - maxStopDist;
+      stopLoss = entry - maxStopDist;
     } else if (currentStopDist < minStopDist) {
-      stopLoss = price - minStopDist;
+      stopLoss = entry - minStopDist;
     }
 
     // High-probability take profits
     // Target 1: Local Swing High - 0.1 * ATR (guarantees exit before major resistance wicks)
-    target1 = ind.swingHigh > price
+    target1 = ind.swingHigh > entry
       ? ind.swingHigh - 0.1 * atr
-      : price + 2.0 * atr;
+      : entry + 2.0 * atr;
 
     // Target 2: Strict 3.0x Risk multiple from Entry
     const risk = entry - stopLoss;
@@ -279,7 +291,7 @@ export function findSweetSpot(
       const bottomLevel = levels[i]!;
       const topLevel = levels[i + 1]!;
       if ((topLevel.val - bottomLevel.val) / bottomLevel.val <= 0.01) {
-        // Confluence Zone Found!
+        // Confluence Zone Found! Entry on 1st resistance, SL above 2nd resistance
         entry = bottomLevel.val;
         stopLoss = topLevel.val + 0.15 * atr;
         confluenceReason = `Confluence Sweet Spot [${bottomLevel.name} + ${topLevel.name}]`;
@@ -289,26 +301,38 @@ export function findSweetSpot(
     }
 
     // Default structural fallback if no cluster is found
-    if (!foundCluster && levels.length > 0) {
-      entry = levels[0]!.val; // Short at the nearest major resistance
-      stopLoss = entry + 1.5 * atr;
+    if (!foundCluster) {
+      if (levels.length >= 2) {
+        // Take entry on 1st resistance, SL above 2nd resistance
+        entry = levels[0]!.val;
+        stopLoss = levels[1]!.val + 0.15 * atr;
+        confluenceReason = `Multi-Resistance Structure [Entry: ${levels[0]!.name} / SL: ${levels[1]!.name}]`;
+      } else if (levels.length === 1) {
+        entry = levels[0]!.val;
+        stopLoss = entry + 1.5 * atr;
+        confluenceReason = `Single Level Resistance [${levels[0]!.name}]`;
+      } else {
+        entry = price;
+        stopLoss = entry + 1.5 * atr;
+        confluenceReason = "No Resistance Levels (Pivot Fallback)";
+      }
     }
 
-    // Ensure stop-loss boundaries
-    const maxStopDist = price * 0.035;
-    const minStopDist = price * 0.005;
-    const currentStopDist = stopLoss - price;
+    // Clamp stop-loss relative to entry price (min 0.5%, max 3.5%) to manage risk
+    const maxStopDist = entry * 0.035;
+    const minStopDist = entry * 0.005;
+    const currentStopDist = stopLoss - entry;
     if (currentStopDist > maxStopDist) {
-      stopLoss = price + maxStopDist;
+      stopLoss = entry + maxStopDist;
     } else if (currentStopDist < minStopDist) {
-      stopLoss = price + minStopDist;
+      stopLoss = entry + minStopDist;
     }
 
     // High-probability take profits
-    // Target 1: Local Swing Low + 0.1 * ATR (guarantees exit before major support wicks)
-    target1 = ind.swingLow > 0 && ind.swingLow < price
+    // Target 1: Local Swing Low + 0.1 * ATR
+    target1 = ind.swingLow > 0 && ind.swingLow < entry
       ? ind.swingLow + 0.1 * atr
-      : price - 2.0 * atr;
+      : entry - 2.0 * atr;
 
     // Target 2: Strict 3.0x Risk multiple
     const risk = stopLoss - entry;

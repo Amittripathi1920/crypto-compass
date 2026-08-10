@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, KeyRound, Loader2, Sparkles, TriangleAlert } from "lucide-react";
+import { Activity, KeyRound, Loader2, Sparkles, TriangleAlert, Compass } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -16,7 +16,8 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import { COINS, PROVIDERS, TIMEFRAMES, providerById, type ProviderId, type Timeframe } from "@/lib/coins";
-import { analyzeCoin } from "@/lib/signal.functions";
+import { analyzeCoin, getPatternAnalysis } from "@/lib/signal.functions";
+import { PatternDashboard } from "@/components/signal/PatternDashboard";
 import { SignalReport } from "@/components/signal/SignalReport";
 import { TradeTrackerCard } from "@/components/tracker/TradeTrackerCard";
 import { ExchangeStatus } from "@/components/signal/ExchangeStatus";
@@ -81,6 +82,7 @@ function Index() {
 
   const activeProvider = useMemo(() => providerById(provider), [provider]);
   const analyze = useServerFn(analyzeCoin);
+  const fetchPatterns = useServerFn(getPatternAnalysis);
 
   const mutation = useMutation({
     mutationFn: () =>
@@ -91,6 +93,16 @@ function Index() {
           provider,
           model: model || undefined,
           apiKey: activeProvider.needsKey ? apiKey.trim() : undefined,
+        },
+      }),
+  });
+
+  const patternMutation = useMutation({
+    mutationFn: () =>
+      fetchPatterns({
+        data: {
+          symbol,
+          timeframe,
         },
       }),
   });
@@ -283,22 +295,47 @@ function Index() {
               )}
             </div>
 
-            <Button
-              className="mt-5 w-full"
-              size="lg"
-              disabled={mutation.isPending || keyMissing}
-              onClick={() => mutation.mutate()}
-            >
-              {mutation.isPending ? (
-                <>
-                  <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analysing {symbol} on {timeframe}…
-                </>
-              ) : (
-                <>
-                  <Sparkles className="mr-2 h-4 w-4" /> Analyse {symbol} · {timeframe}
-                </>
-              )}
-            </Button>
+            <div className="mt-5 flex flex-col sm:flex-row gap-3 w-full">
+              <Button
+                className="flex-grow"
+                size="lg"
+                disabled={mutation.isPending || keyMissing}
+                onClick={() => {
+                  patternMutation.reset();
+                  mutation.mutate();
+                }}
+              >
+                {mutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Generating Setup...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" /> Generate Trade Setup
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="outline"
+                className="flex-grow border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground"
+                size="lg"
+                disabled={patternMutation.isPending}
+                onClick={() => {
+                  mutation.reset();
+                  patternMutation.mutate();
+                }}
+              >
+                {patternMutation.isPending ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning Patterns...
+                  </>
+                ) : (
+                  <>
+                    <Compass className="mr-2 h-4 w-4" /> Pattern/Analysis
+                  </>
+                )}
+              </Button>
+            </div>
             {keyMissing ? (
               <p className="mt-2 text-center text-[11px] text-muted-foreground">
                 Enter an API key, or switch back to the built-in Lovable AI.
@@ -353,6 +390,26 @@ function Index() {
           ) : null}
 
           {mutation.data && !mutation.isPending ? <SignalReport result={mutation.data} /> : null}
+
+          {patternMutation.isPending ? (
+            <div className="space-y-3">
+              <Skeleton className="h-40 w-full rounded-xl" />
+              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
+                {[0, 1, 2, 3].map((i) => (
+                  <Skeleton key={i} className="h-20 rounded-lg" />
+                ))}
+              </div>
+            </div>
+          ) : null}
+
+          {patternMutation.data && !patternMutation.isPending ? (
+            <PatternDashboard
+              patterns={patternMutation.data.patterns}
+              candles={patternMutation.data.candles}
+              symbol={symbol}
+              timeframe={timeframe}
+            />
+          ) : null}
 
           <TradeTrackerCard />
 
