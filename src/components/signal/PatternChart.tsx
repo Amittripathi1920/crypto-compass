@@ -116,10 +116,8 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
           // Prevent zero-span lines as duplicate keys on the same series will crash the chart
           if (tStart === tEnd) return;
 
-          const lineSeries = chart.addAreaSeries({
-            lineColor: l.color === "var(--bull)" ? "#0ecb81" : l.color === "var(--bear)" ? "#f6465d" : "#3b82f6",
-            topColor: "rgba(0, 0, 0, 0)",
-            bottomColor: "rgba(0, 0, 0, 0)",
+          const lineSeries = chart.addLineSeries({
+            color: l.color === "var(--bull)" ? "#0ecb81" : l.color === "var(--bear)" ? "#f6465d" : "#3b82f6",
             lineWidth: 1.8,
             lineStyle: l.style === "dashed" ? LineStyle.Dashed : LineStyle.Solid,
             priceLineVisible: false,

@@ -49,9 +49,33 @@ export const Route = createFileRoute("/")({
   component: Index,
 });
 
+if (typeof window !== "undefined") {
+  (window as any).__errors = (window as any).__errors || [];
+  window.onerror = function (message, source, lineno, colno, error) {
+    (window as any).__errors.push({ type: 'onerror', message, source, lineno, colno, error: error?.stack });
+  };
+  const prevError = console.error;
+  console.error = function (...args) {
+    (window as any).__errors.push({ type: 'console.error', args: args.map(a => a instanceof Error ? a.stack : String(a)) });
+    prevError.apply(console, args);
+  };
+}
+
 function Index() {
   const { data: sessionData } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
+  const [browserErrors, setBrowserErrors] = useState<any[]>([]);
+
+  useEffect(() => {
+    if (typeof window === "undefined") return;
+    const interval = setInterval(() => {
+      const errs = (window as any).__errors || [];
+      if (errs.length !== browserErrors.length) {
+        setBrowserErrors([...errs]);
+      }
+    }, 1000);
+    return () => clearInterval(interval);
+  }, [browserErrors]);
 
   const [symbol, setSymbol] = useState<string>("BTC");
   const [timeframe, setTimeframe] = useState<Timeframe>("4h");
@@ -412,6 +436,15 @@ function Index() {
           ) : null}
 
           <TradeTrackerCard />
+
+          {browserErrors.length > 0 ? (
+            <div className="rounded-xl border border-red-500/30 bg-red-500/10 p-4 mt-2 space-y-2">
+              <h4 className="text-sm font-bold text-red-400">Captured Browser Error Logs ({browserErrors.length})</h4>
+              <pre className="text-[10px] text-red-300 font-mono whitespace-pre-wrap max-h-48 overflow-y-auto bg-black/40 p-2.5 rounded-lg border border-red-500/20">
+                {JSON.stringify(browserErrors, null, 2)}
+              </pre>
+            </div>
+          ) : null}
 
           <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
 
