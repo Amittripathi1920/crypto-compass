@@ -1,8 +1,8 @@
-import { createFileRoute } from "@tanstack/react-router";
+import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, KeyRound, Loader2, Sparkles, TriangleAlert } from "lucide-react";
+import { Activity, History, KeyRound, Loader2, Sparkles, TriangleAlert } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -103,6 +103,12 @@ function Index() {
             into a directional call with concrete trade levels. Nothing is stored — every run is
             fresh.
           </p>
+          <Link
+            to="/backtest"
+            className="mt-4 inline-flex items-center gap-1.5 text-xs font-medium text-primary hover:underline"
+          >
+            <History className="h-3.5 w-3.5" /> Backtest these rules on history
+          </Link>
         </div>
       </div>
 
