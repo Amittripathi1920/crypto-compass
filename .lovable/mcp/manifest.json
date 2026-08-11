@@ -1,0 +1,178 @@
+{
+  "version": 1,
+  "sdk_version": "0.26.2",
+  "path": "/mcp",
+  "auth": {
+    "type": "none"
+  },
+  "mcp": {
+    "server": {
+      "name": "crypto-compass",
+      "version": "0.1.0",
+      "title": "Crypto Compass"
+    },
+    "tools": [
+      {
+        "name": "list_supported_markets",
+        "title": "List supported markets",
+        "description": "List the crypto symbols and timeframes this analyzer supports. Call this first to pick valid arguments for the other tools.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": true,
+          "openWorldHint": false
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_live_price",
+        "title": "Get live price",
+        "description": "Get the live price and 24h stats (change %, high, low) for a crypto symbol, sourced from OKX, Binance or Kraken.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Coin symbol in upper case, e.g. BTC, ETH, SOL."
+            }
+          },
+          "required": [
+            "symbol"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_technical_indicators",
+        "title": "Get technical indicators",
+        "description": "Compute RSI, MACD, EMA 20/50/200, ATR, swing high/low, trend and volume readings from live candles for a symbol and timeframe.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Coin symbol in upper case, e.g. BTC."
+            },
+            "timeframe": {
+              "type": "string",
+              "enum": [
+                "4h",
+                "8h",
+                "1d",
+                "1w"
+              ],
+              "description": "Candle timeframe."
+            }
+          },
+          "required": [
+            "symbol",
+            "timeframe"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "detect_chart_patterns",
+        "title": "Detect chart patterns",
+        "description": "Detect classic chart patterns (double top/bottom, head and shoulders, triangles, wedges, flags) on live candles, with confidence, target and invalidation levels.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Coin symbol in upper case, e.g. BTC."
+            },
+            "timeframe": {
+              "type": "string",
+              "enum": [
+                "4h",
+                "8h",
+                "1d",
+                "1w"
+              ],
+              "description": "Candle timeframe."
+            }
+          },
+          "required": [
+            "symbol",
+            "timeframe"
+          ]
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "get_market_sentiment",
+        "title": "Get market sentiment",
+        "description": "Get the crypto Fear & Greed index plus global market metrics such as BTC dominance and total market cap.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {}
+        },
+        "outputSchema": null
+      },
+      {
+        "name": "analyze_trade_signal",
+        "title": "Analyze trade signal",
+        "description": "Run the full analysis for a symbol and timeframe: LONG / SHORT / NO TRADE verdict with confidence, entry, stop loss, two targets, risk-reward and written reasoning.",
+        "annotations": {
+          "readOnlyHint": true,
+          "idempotentHint": false,
+          "openWorldHint": true
+        },
+        "inputSchema": {
+          "$schema": "http://json-schema.org/draft-07/schema#",
+          "type": "object",
+          "properties": {
+            "symbol": {
+              "type": "string",
+              "description": "Coin symbol in upper case, e.g. BTC."
+            },
+            "timeframe": {
+              "type": "string",
+              "enum": [
+                "4h",
+                "8h",
+                "1d",
+                "1w"
+              ],
+              "description": "Analysis timeframe."
+            }
+          },
+          "required": [
+            "symbol",
+            "timeframe"
+          ]
+        },
+        "outputSchema": null
+      }
+    ]
+  }
+}

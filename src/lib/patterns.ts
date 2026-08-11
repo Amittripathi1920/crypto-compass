@@ -97,7 +97,7 @@ export function detectPatterns(candles: Candle[]): DetectedPattern[] {
   // Deduplication helper to prevent overlapping duplicate patterns of the same type
   const isDuplicate = (type: string, startIndex: number) => {
     return patterns.some(
-      (p) => p.type === type && Math.abs(p.points[0]?.index - startIndex) < 6
+      (p) => p.type === type && Math.abs((p.points[0]?.index ?? -999) - startIndex) < 6
     );
   };
 
