@@ -32,3 +32,11 @@ Drop the third-party chart library for pattern rendering and draw the pattern ch
 - No changes needed to `src/lib/patterns.ts` (detector output already provides `points`, `lines`, `targetPrice`, `invalidPrice`) or to `PatternDashboard.tsx`.
 - Remove the now-unused `lightweight-charts` dependency if nothing else imports it.
 - Verify by driving the live preview: run an analysis, confirm pattern cards render candles plus overlay lines, and check the console is clean.
+
+## Pre-existing type errors to clear in the same pass
+
+The project currently fails typecheck on unrelated files; these will be fixed too so the build is green:
+
+- `fillTime` optional-vs-required mismatch in `src/lib/tracker-types.ts` / `tracker.server.ts` / `tracker.functions.ts` / `useTradeTracker.tsx`.
+- `process.env.DATABASE_URL` index-signature access in `src/lib/db/index.ts`.
+- Possibly-undefined `p.points[0]` access at `src/lib/patterns.ts:100`.
