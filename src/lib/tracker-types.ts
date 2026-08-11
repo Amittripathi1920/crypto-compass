@@ -22,8 +22,8 @@ export type TrackedTrade = {
   balance: number;
   entryTime: number; // timestamp when tracked
   fillTime?: number | undefined; // timestamp when entry price was filled
-  closeTime?: number; // timestamp when trade hit final TP2, SL, BE or was cancelled
+  closeTime?: number | undefined; // timestamp when trade hit final TP2, SL, BE or was cancelled
   status: TradeStatus;
-  currentPrice?: number;
+  currentPrice?: number | undefined;
   history: TrackerHistoryLog[];
 };
