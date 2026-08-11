@@ -1,5 +1,5 @@
 import { defineMcp } from "@lovable.dev/mcp-js";
-import type { AnyToolDefinition } from "@lovable.dev/mcp-js";
+import type { ToolDefinition } from "@lovable.dev/mcp-js";
 import listMarketsTool from "./tools/list-coins";
 import getLivePriceTool from "./tools/get-price";
 import getIndicatorsTool from "./tools/get-indicators";
@@ -20,5 +20,5 @@ export default defineMcp({
     detectPatternsTool,
     getSentimentTool,
     analyzeSignalTool,
-  ] as AnyToolDefinition[],
+  ] as unknown as ToolDefinition<Record<string, never>, undefined>[],
 });
