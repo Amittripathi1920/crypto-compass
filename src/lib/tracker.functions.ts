@@ -3,6 +3,7 @@ import { z } from "zod";
 import { db } from "./db";
 import { trackedTrades, user, session } from "./db/schema";
 import { eq, and, inArray, desc } from "drizzle-orm";
+import { createRemoteJWKSet, jwtVerify } from "jose";
 
 // Zod Schema matching tracker types
 const TrackedTradeSchema = z.object({
@@ -41,20 +42,30 @@ export const validateTrades = createServerFn({ method: "POST" })
     return validateActiveTrades(data as any);
   });
 
-// Validate user session token directly against database
+const JWKS = createRemoteJWKSet(
+  new URL(
+    process.env['NEON_JWKS_URL'] || 
+    "https://ep-calm-mountain-ayvot686.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth/.well-known/jwks.json"
+  )
+);
+
+// Validate user JWT token using Neon JWKS
 async function getSessionUser(token: string) {
   if (!token) return null;
 
   try {
-    const [row] = await db
-      .select({ user })
-      .from(session)
-      .innerJoin(user, eq(session.userId, user.id))
-      .where(eq(session.token, token));
+    const { payload } = await jwtVerify(token, JWKS);
+    const userId = payload.sub;
+    if (!userId) return null;
 
-    return row?.user || null;
+    const [dbUser] = await db
+      .select()
+      .from(user)
+      .where(eq(user.id, userId));
+
+    return dbUser || null;
   } catch (e) {
-    console.error("[tracker] Failed to fetch session from db:", e);
+    console.error("[tracker] Failed to verify JWT token:", e);
     return null;
   }
 }

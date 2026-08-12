@@ -1,6 +1,6 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
-import { useSession } from "@/lib/auth-client";
+import { useSession, authClient } from "@/lib/auth-client";
 import { 
   validateTrades, 
   getUserTrades, 
@@ -29,7 +29,16 @@ const TradeTrackerContext = createContext<TradeTrackerContextType | undefined>(u
 export function TradeTrackerProvider({ children }: { children: React.ReactNode }) {
   const { data: sessionData, isPending: isSessionLoading } = useSession();
   const isLoggedIn = !!sessionData?.user;
-  const token = sessionData?.session?.token || "";
+
+  const getJwtToken = async () => {
+    try {
+      const res = await authClient.token();
+      return res.data?.token || "";
+    } catch (e) {
+      console.error("[tracker] Failed to retrieve JWT token:", e);
+      return "";
+    }
+  };
 
   const [trades, setTrades] = useState<TrackedTrade[]>([]);
   const [isValidating, setIsValidating] = useState(false);
@@ -46,10 +55,11 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
   const loadTrades = async () => {
     if (isSessionLoading) return;
 
-    if (isLoggedIn && token) {
+    if (isLoggedIn) {
       setIsValidating(true);
       try {
-        const rows = await getDbTrades({ data: { token } });
+        const jwt = await getJwtToken();
+        const rows = await getDbTrades({ data: { token: jwt } });
         setTrades(rows as any);
       } catch (e) {
         console.error("[tracker] Failed to fetch trades from db:", e);
@@ -74,7 +84,7 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
 
   useEffect(() => {
     loadTrades();
-  }, [isLoggedIn, isSessionLoading, token]);
+  }, [isLoggedIn, isSessionLoading]);
 
   const saveLocalTrades = (newTrades: TrackedTrade[]) => {
     try {
@@ -116,10 +126,12 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
       ],
     };
 
-    if (isLoggedIn && token) {
+    if (isLoggedIn) {
       setIsValidating(true);
       try {
-        await trackDbTrade({ data: { trade: newTrade, token } });
+        const jwt = await getJwtToken();
+        if (!jwt) throw new Error("Could not retrieve authentication token.");
+        await trackDbTrade({ data: { trade: newTrade, token: jwt } });
         setTrades([newTrade, ...trades]);
         toast.success(`Position tracked in database: ${tradeData.symbol}/USDT at $${tradeData.entry.toLocaleString()}`);
       } catch (e) {
@@ -136,10 +148,12 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
   };
 
   const cancelTrade = async (id: string) => {
-    if (isLoggedIn && token) {
+    if (isLoggedIn) {
       setIsValidating(true);
       try {
-        await cancelDbTrade({ data: { id, token } });
+        const jwt = await getJwtToken();
+        if (!jwt) throw new Error("Could not retrieve authentication token.");
+        await cancelDbTrade({ data: { id, token: jwt } });
         // Optimistic / Local update for fast UI response
         setTrades(
           trades.map((t) => {
@@ -194,10 +208,12 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
   };
 
   const removeTrade = async (id: string) => {
-    if (isLoggedIn && token) {
+    if (isLoggedIn) {
       setIsValidating(true);
       try {
-        await removeDbTrade({ data: { id, token } });
+        const jwt = await getJwtToken();
+        if (!jwt) throw new Error("Could not retrieve authentication token.");
+        await removeDbTrade({ data: { id, token: jwt } });
         setTrades(trades.filter((t) => t.id !== id));
         toast.success("Position removed from history.");
       } catch (e) {
@@ -222,9 +238,11 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
 
     setIsValidating(true);
     try {
-      if (isLoggedIn && token) {
+      if (isLoggedIn) {
         // Sync database active trades on server
-        const updatedList = await syncDbTrades({ data: { token } });
+        const jwt = await getJwtToken();
+        if (!jwt) throw new Error("Could not retrieve authentication token.");
+        const updatedList = await syncDbTrades({ data: { token: jwt } });
 
         // Notify status updates
         updatedList.forEach((newT) => {
@@ -287,7 +305,7 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
     }, 15000);
 
     return () => clearInterval(interval);
-  }, [trades.length, isLoggedIn, token]);
+  }, [trades.length, isLoggedIn]);
 
   return (
     <TradeTrackerContext.Provider
