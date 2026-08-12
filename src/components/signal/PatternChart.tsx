@@ -30,20 +30,26 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
   const model = useMemo(() => {
     if (candles.length === 0) return null;
 
-    // Focus window: from the earliest pattern feature (with lead-in) to the end
-    const idxs = [
+    // Focus window: pattern structure only (ignore long projection tails), plus a trailing buffer
+    const structureIdxs = [
       ...pattern.points.map((p) => p.index),
       ...pattern.lines.flatMap((l) => [l.startIndex, l.endIndex]),
-    ].filter((i) => Number.isFinite(i));
-    const minIdx = Math.max(0, Math.min(...(idxs.length ? idxs : [0])) - 6);
-    const view = candles.slice(minIdx);
+    ].filter((i) => Number.isFinite(i) && i >= 0 && i < candles.length);
+    const base = structureIdxs.length ? structureIdxs : [0, candles.length - 1];
+    const structMin = Math.min(...base);
+    const structMax = Math.max(...base);
+    const minIdx = Math.max(0, structMin - 5);
+    const maxIdx = Math.min(candles.length - 1, Math.max(structMax, structMin + 10) + 10);
+    const view = candles.slice(minIdx, maxIdx + 1);
     if (view.length === 0) return null;
 
+    const inWindow = (i: number) => i >= minIdx && i <= maxIdx;
     const overlayPrices = [
-      ...pattern.points.map((p) => p.price),
-      ...pattern.lines.flatMap((l) => [l.startPrice, l.endPrice]),
-      pattern.targetPrice,
-      pattern.invalidPrice,
+      ...pattern.points.filter((p) => inWindow(p.index)).map((p) => p.price),
+      ...pattern.lines.flatMap((l) => [
+        ...(inWindow(l.startIndex) ? [l.startPrice] : []),
+        ...(inWindow(l.endIndex) ? [l.endPrice] : []),
+      ]),
     ].filter((v) => Number.isFinite(v));
 
     const highs = view.map((c) => c.high);
@@ -51,15 +57,16 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
     const rawMax = Math.max(...highs, ...overlayPrices);
     const rawMin = Math.min(...lows, ...overlayPrices);
     const span = rawMax - rawMin || Math.max(1e-8, rawMax * 0.01);
-    const top = rawMax + span * 0.08;
-    const bottom = rawMin - span * 0.08;
+    const top = rawMax + span * 0.1;
+    const bottom = rawMin - span * 0.1;
 
     const y = (v: number) => ((top - v) / (top - bottom)) * PLOT_H + PAD_T;
     const step = PLOT_W / view.length;
     const x = (i: number) => (i - minIdx) * step + step / 2;
     const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => top - f * (top - bottom));
+    const inRange = (v: number) => Number.isFinite(v) && v <= top && v >= bottom;
 
-    return { view, minIdx, y, x, step, ticks };
+    return { view, minIdx, y, x, step, ticks, inRange };
   }, [candles, pattern, PLOT_H, PLOT_W]);
 
   const handleDownloadPNG = () => {
@@ -97,7 +104,7 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
     );
   }
 
-  const { view, minIdx, y, x, step, ticks } = model;
+  const { view, minIdx, y, x, step, ticks, inRange } = model;
   const bodyW = Math.max(1.4, step * 0.62);
   const active = hover !== null ? view[hover] : undefined;
 
@@ -157,7 +164,7 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
             { v: pattern.targetPrice, label: "TGT", color: "#0ecb81" },
             { v: pattern.invalidPrice, label: "INV", color: "#f6465d" },
           ]
-            .filter((l) => Number.isFinite(l.v))
+            .filter((l) => inRange(l.v))
             .map((l) => (
               <g key={l.label}>
                 <line
@@ -179,6 +186,7 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
           {/* pattern lines */}
           {pattern.lines.map((l, i) => {
             const c = resolveColor(l.color);
+            if (!inRange(l.startPrice) && !inRange(l.endPrice)) return null;
             const x1 = clampX(l.startIndex);
             const x2 = clampX(l.endIndex);
             return (
@@ -199,7 +207,7 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
           {/* pattern points */}
           {pattern.points.map((p, i) => {
             const candle = candles[p.index];
-            if (!candle) return null;
+            if (!candle || !inRange(p.price)) return null;
             const px = clampX(p.index);
             const py = y(p.price);
             const isLow = p.price < (candle.open + candle.close) / 2;
