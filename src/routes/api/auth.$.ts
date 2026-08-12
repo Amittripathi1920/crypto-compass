@@ -7,7 +7,17 @@ async function proxyAuthRequest(request: Request, subpath: string) {
   const targetUrl = `${NEON_AUTH_URL}/${subpath}${url.search}`;
 
   const headers = new Headers(request.headers);
-  headers.set("Host", "ep-calm-mountain-ayvot686.neonauth.c-5.us-east-2.aws.neon.tech");
+  const targetHost = "ep-calm-mountain-ayvot686.neonauth.c-5.us-east-2.aws.neon.tech";
+  const targetOrigin = `https://${targetHost}`;
+
+  // Override headers to present the request as same-origin to the Neon Auth server,
+  // bypassing CSRF/origin rejections.
+  headers.set("Host", targetHost);
+  headers.set("Origin", targetOrigin);
+  headers.set("Referer", `${targetOrigin}/`);
+  headers.set("Sec-Fetch-Site", "same-origin");
+  headers.delete("Sec-Fetch-Mode");
+  headers.delete("Sec-Fetch-Dest");
 
   const hasBody = request.body !== null && ["POST", "PUT", "PATCH", "DELETE"].includes(request.method);
   const body = hasBody ? await request.clone().arrayBuffer() : undefined;
