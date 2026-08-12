@@ -2,7 +2,7 @@ import { createFileRoute, Link } from "@tanstack/react-router";
 import { useServerFn } from "@tanstack/react-start";
 import { useMutation } from "@tanstack/react-query";
 import { useEffect, useMemo, useState } from "react";
-import { Activity, KeyRound, Loader2, Sparkles, TriangleAlert, Compass } from "lucide-react";
+import { Activity, KeyRound, Loader2, Sparkles, TriangleAlert, Compass, ChevronDown, ChevronUp } from "lucide-react";
 
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
@@ -17,6 +17,7 @@ import {
 import { Skeleton } from "@/components/ui/skeleton";
 import { COINS, PROVIDERS, TIMEFRAMES, providerById, type ProviderId, type Timeframe } from "@/lib/coins";
 import { analyzeCoin, getPatternAnalysis } from "@/lib/signal.functions";
+import { fmtPrice } from "@/components/signal/format";
 import { PatternDashboard } from "@/components/signal/PatternDashboard";
 import { SignalReport } from "@/components/signal/SignalReport";
 import { TradeTrackerCard } from "@/components/tracker/TradeTrackerCard";
@@ -86,6 +87,49 @@ function Index() {
   const [minRR, setMinRR] = useState(1.5);
   const [atrMult, setAtrMult] = useState(1.5);
   const [pivotStr, setPivotStr] = useState(4);
+
+  const [bulkScannedResults, setBulkScannedResults] = useState<Record<string, any>>({});
+  const [bulkScanning, setBulkScanning] = useState(false);
+  const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentSymbol: "" });
+  const [expandedSymbols, setExpandedSymbols] = useState<Record<string, boolean>>({});
+
+  const handleScanAll = async () => {
+    setBulkScanning(true);
+    setBulkScannedResults({});
+    setExpandedSymbols({});
+    setBulkProgress({ current: 0, total: COINS.length, currentSymbol: "" });
+
+    const results: Record<string, any> = {};
+
+    for (let i = 0; i < COINS.length; i++) {
+      const coin = COINS[i]!;
+      setBulkProgress({ current: i + 1, total: COINS.length, currentSymbol: coin.symbol });
+      try {
+        const res = await analyzeCoin({
+          data: {
+            symbol: coin.symbol,
+            timeframe,
+            provider,
+            model,
+            apiKey,
+            minScore,
+            minRR,
+            atrMult,
+            pivotStr,
+          },
+        });
+        results[coin.symbol] = { ok: true, data: res };
+      } catch (err: any) {
+        results[coin.symbol] = { ok: false, error: err.message || "Scan failed" };
+      }
+      setBulkScannedResults({ ...results });
+      
+      // Delay to avoid hitting API limits
+      await new Promise((resolve) => setTimeout(resolve, 500));
+    }
+
+    setBulkScanning(false);
+  };
 
   useEffect(() => {
     try {
@@ -216,18 +260,23 @@ function Index() {
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   Coin
                 </Label>
-                <Select value={symbol} onValueChange={setSymbol}>
-                  <SelectTrigger className="w-full">
-                    <SelectValue />
-                  </SelectTrigger>
-                  <SelectContent>
+                <div className="relative">
+                  <Input
+                    type="text"
+                    value={symbol}
+                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
+                    placeholder="E.g. BTC, SOL, DOGE"
+                    className="w-full uppercase bg-background/50 border-border focus:border-primary text-sm h-10"
+                    list="supported-coins-list"
+                  />
+                  <datalist id="supported-coins-list">
                     {COINS.map((c) => (
-                      <SelectItem key={c.symbol} value={c.symbol}>
-                        {c.symbol} · {c.name}
-                      </SelectItem>
+                      <option key={c.symbol} value={c.symbol}>
+                        {c.name}
+                      </option>
                     ))}
-                  </SelectContent>
-                </Select>
+                  </datalist>
+                </div>
               </div>
 
               <div className="space-y-1.5">
@@ -414,13 +463,14 @@ function Index() {
               </details>
             </div>
 
-            <div className="mt-5 flex flex-col sm:flex-row gap-3 w-full">
+            <div className="mt-5 grid gap-3 sm:grid-cols-3 w-full">
               <Button
-                className="flex-grow"
+                className="flex-grow animate-fade-in"
                 size="lg"
-                disabled={mutation.isPending || keyMissing}
+                disabled={mutation.isPending || keyMissing || bulkScanning}
                 onClick={() => {
                   patternMutation.reset();
+                  setBulkScannedResults({});
                   mutation.mutate();
                 }}
               >
@@ -438,9 +488,10 @@ function Index() {
                 variant="outline"
                 className="flex-grow border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground"
                 size="lg"
-                disabled={patternMutation.isPending}
+                disabled={patternMutation.isPending || bulkScanning}
                 onClick={() => {
                   mutation.reset();
+                  setBulkScannedResults({});
                   patternMutation.mutate();
                 }}
               >
@@ -451,6 +502,23 @@ function Index() {
                 ) : (
                   <>
                     <Compass className="mr-2 h-4 w-4" /> Pattern/Analysis
+                  </>
+                )}
+              </Button>
+              <Button
+                variant="default"
+                className="flex-grow bg-bull/90 hover:bg-bull text-white font-bold"
+                size="lg"
+                disabled={mutation.isPending || patternMutation.isPending || bulkScanning}
+                onClick={handleScanAll}
+              >
+                {bulkScanning ? (
+                  <>
+                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning ({bulkProgress.current}/{bulkProgress.total})...
+                  </>
+                ) : (
+                  <>
+                    <Sparkles className="mr-2 h-4 w-4" /> Scan All Coins
                   </>
                 )}
               </Button>
@@ -528,6 +596,171 @@ function Index() {
               symbol={symbol}
               timeframe={timeframe}
             />
+          ) : null}
+
+          {/* Bulk Scanning Progress and List */}
+          {(bulkScanning || Object.keys(bulkScannedResults).length > 0) ? (
+            <section className="rounded-xl border border-border bg-card/60 p-5 space-y-4">
+              <div className="flex items-center justify-between border-b border-border/40 pb-3">
+                <div>
+                  <h2 className="text-sm font-bold tracking-wider text-foreground uppercase">
+                    Bulk Confluence Scan Results ({TIMEFRAMES.find(t => t.value === timeframe)?.label || timeframe})
+                  </h2>
+                  <p className="text-[10px] text-muted-foreground">
+                    Sequential confluence analysis of supported exchange-traded tokens
+                  </p>
+                </div>
+                {bulkScanning && (
+                  <div className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-wider">
+                    <Loader2 className="h-3 w-3 animate-spin" />
+                    <span>Scanning {bulkProgress.currentSymbol} ({bulkProgress.current}/{bulkProgress.total})</span>
+                  </div>
+                )}
+              </div>
+
+              {/* Progress bar */}
+              {bulkScanning && (
+                <div className="w-full bg-muted/30 rounded-full h-1 overflow-hidden">
+                  <div
+                    className="bg-primary h-1 transition-all duration-300 rounded-full"
+                    style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
+                  ></div>
+                </div>
+              )}
+
+              {/* Accordion List */}
+              <div className="space-y-2">
+                {COINS.map((coin) => {
+                  const resultObj = bulkScannedResults[coin.symbol];
+                  const isExpanded = !!expandedSymbols[coin.symbol];
+                  
+                  return (
+                    <div
+                      key={coin.symbol}
+                      className={cn(
+                        "rounded-lg border bg-background/20 transition-all",
+                        isExpanded ? "border-primary/30 shadow-md bg-background/35" : "border-border/40 hover:border-border/70"
+                      )}
+                    >
+                      {/* Accordion Summary Row */}
+                      <div
+                        className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 cursor-pointer select-none hover:bg-muted/10 text-xs"
+                        onClick={() => {
+                          if (resultObj) {
+                            setExpandedSymbols({
+                              ...expandedSymbols,
+                              [coin.symbol]: !isExpanded
+                            });
+                          }
+                        }}
+                      >
+                        <div className="flex items-center gap-2 min-w-[130px]">
+                          <span className="font-bold text-xs tracking-wider text-foreground">{coin.symbol}</span>
+                          <span className="text-[10px] text-muted-foreground truncate max-w-[90px]">{coin.name}</span>
+                        </div>
+
+                        {/* Result Content */}
+                        {resultObj ? (
+                          resultObj.ok ? (
+                            <>
+                              {/* Direction */}
+                              <div className="min-w-[80px]">
+                                {resultObj.data.direction === "LONG" ? (
+                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-bull/10 text-bull border border-bull/20 uppercase tracking-wide">
+                                    ▲ LONG
+                                  </span>
+                                ) : resultObj.data.direction === "SHORT" ? (
+                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-bear/10 text-bear border border-bear/20 uppercase tracking-wide">
+                                    ▼ SHORT
+                                  </span>
+                                ) : (
+                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-muted/20 text-muted-foreground border border-border/30 uppercase tracking-wide">
+                                    ■ NO TRADE
+                                  </span>
+                                )}
+                              </div>
+
+                              {/* Price Levels (Entry / Stop / Targets) */}
+                              {resultObj.data.direction !== "NO_TRADE" ? (
+                                <div className="hidden md:flex items-center gap-4 text-[10px] font-mono">
+                                  <div>
+                                    <span className="text-muted-foreground mr-1 text-[9px] uppercase">Entry:</span>
+                                    <span className="font-semibold text-foreground">${fmtPrice(resultObj.data.entry)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground mr-1 text-[9px] uppercase">Stop:</span>
+                                    <span className="font-semibold text-bear">${fmtPrice(resultObj.data.stopLoss)}</span>
+                                  </div>
+                                  <div>
+                                    <span className="text-muted-foreground mr-1 text-[9px] uppercase">Target 1:</span>
+                                    <span className="font-semibold text-bull">${fmtPrice(resultObj.data.target1)}</span>
+                                  </div>
+                                </div>
+                              ) : (
+                                <div className="hidden md:block text-[9px] text-muted-foreground truncate max-w-[220px]">
+                                  {resultObj.data.summary || "No clear confluence setup found."}
+                                </div>
+                              )}
+
+                              {/* Score and RR */}
+                              <div className="flex items-center gap-4 ml-auto sm:ml-0">
+                                {resultObj.data.direction !== "NO_TRADE" && (
+                                  <div className="hidden xs:block text-right">
+                                    <p className="text-[8px] uppercase tracking-wider text-muted-foreground">R:R</p>
+                                    <p className="text-[10px] font-bold font-mono text-foreground">{resultObj.data.riskReward.toFixed(1)}x</p>
+                                  </div>
+                                )}
+
+                                <div className="text-right min-w-[50px]">
+                                  <p className="text-[8px] uppercase tracking-wider text-muted-foreground">Score</p>
+                                  {resultObj.data.direction !== "NO_TRADE" ? (
+                                    <p className={cn(
+                                      "text-[10px] font-bold font-mono",
+                                      resultObj.data.score.combined >= 75 ? "text-bull" : resultObj.data.score.combined >= 60 ? "text-primary" : "text-muted-foreground"
+                                    )}>
+                                      {resultObj.data.score.combined}%
+                                    </p>
+                                  ) : (
+                                    <p className="text-[10px] font-bold font-mono text-muted-foreground">N/A</p>
+                                  )}
+                                </div>
+                                
+                                <span className="text-muted-foreground/60">
+                                  {isExpanded ? <ChevronUp className="h-3.5 w-3.5" /> : <ChevronDown className="h-3.5 w-3.5" />}
+                                </span>
+                              </div>
+                            </>
+                          ) : (
+                            <div className="flex-1 flex items-center justify-between text-[10px] text-bear">
+                              <span>⚠️ Error: {resultObj.error}</span>
+                              <span className="text-[9px] uppercase font-bold bg-bear/5 px-1.5 py-0.5 rounded border border-bear/20">Failed</span>
+                            </div>
+                          )
+                        ) : (
+                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground italic">
+                            {bulkScanning && bulkProgress.currentSymbol === coin.symbol ? (
+                              <>
+                                <Loader2 className="h-2.5 w-2.5 animate-spin text-primary" />
+                                <span>Scanning live candles...</span>
+                              </>
+                            ) : (
+                              <span>Pending scan...</span>
+                            )}
+                          </div>
+                        )}
+                      </div>
+
+                      {/* Accordion Content (Full Signal Report when expanded) */}
+                      {isExpanded && resultObj?.ok && (
+                        <div className="border-t border-border/30 bg-background/5 p-4">
+                          <SignalReport result={resultObj.data} />
+                        </div>
+                      )}
+                    </div>
+                  );
+                })}
+              </div>
+            </section>
           ) : null}
 
           <TradeTrackerCard />

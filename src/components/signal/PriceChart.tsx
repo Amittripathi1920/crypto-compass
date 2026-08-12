@@ -11,16 +11,16 @@ import { LiquidityEngine } from "@/lib/engine/LiquidityEngine";
 
 type Level = { label: string; value: number; color: string };
 
-const W = 760;
-const H = 390;
-const PAD_R = 80;
+const W = 960;
+const H = 490;
+const PAD_R = 90;
 const PAD_T = 12;
-const PRICE_H = 200;
+const PRICE_H = 290;
 const PLOT_W = W - PAD_R;
 const VOL_TOP = PAD_T + PRICE_H + 18;
-const VOL_H = 36;
+const VOL_H = 40;
 const RSI_TOP = VOL_TOP + VOL_H + 22;
-const RSI_H = 68;
+const RSI_H = 76;
 
 function line(points: { x: number; y: number }[]) {
   return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
@@ -150,7 +150,7 @@ export function PriceChartInner({
       <svg
         id="price-chart-svg"
         viewBox={`0 0 ${W} ${H}`}
-        className={cn("w-full touch-none", isMaximized ? "h-[540px]" : "h-[390px]")}
+        className={cn("w-full touch-none", isMaximized ? "h-[620px]" : "h-[490px]")}
         role="img"
         aria-label="Recent price candles with EMAs, volume, RSI and trade levels"
         onMouseLeave={() => {
