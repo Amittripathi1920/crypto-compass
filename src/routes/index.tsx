@@ -79,27 +79,31 @@ function Index() {
 
   const [symbol, setSymbol] = useState<string>("BTC");
   const [timeframe, setTimeframe] = useState<Timeframe>("4h");
-  const [provider, setProvider] = useState<ProviderId>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("cc_prev_provider");
-      if (saved) return saved as ProviderId;
+  const [provider, setProvider] = useState<ProviderId>("lovable");
+  const [model, setModel] = useState<string>(PROVIDERS[0]!.defaultModel);
+  const [apiKey, setApiKey] = useState<string>("");
+
+  useEffect(() => {
+    try {
+      const savedProvider = localStorage.getItem("cc_prev_provider");
+      if (savedProvider) {
+        setProvider(savedProvider as ProviderId);
+        // Load the correct saved model for this provider if it exists
+        const savedModel = localStorage.getItem("cc_prev_model");
+        if (savedModel) {
+          setModel(savedModel);
+        } else {
+          setModel(providerById(savedProvider as ProviderId).defaultModel);
+        }
+      }
+      const savedApiKey = localStorage.getItem("cc_prev_api_key");
+      if (savedApiKey) {
+        setApiKey(savedApiKey);
+      }
+    } catch (e) {
+      // Ignore localStorage errors in sandboxes/private browsing
     }
-    return "lovable";
-  });
-  const [model, setModel] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("cc_prev_model");
-      if (saved) return saved;
-    }
-    return PROVIDERS[0]!.defaultModel;
-  });
-  const [apiKey, setApiKey] = useState<string>(() => {
-    if (typeof window !== "undefined") {
-      const saved = localStorage.getItem("cc_prev_api_key");
-      if (saved) return saved;
-    }
-    return "";
-  });
+  }, []);
   const [lastSuccess, setLastSuccess] = useState<
     { at: string; symbol: string; timeframe: Timeframe; source: string } | null
   >(null);

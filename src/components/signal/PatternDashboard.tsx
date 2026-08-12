@@ -57,7 +57,7 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
           return (
             <div
               key={p.id}
-              className="flex flex-col rounded-xl border border-border/50 bg-card/45 p-4 transition-all hover:border-border/80 hover:bg-card/75 shadow-lg"
+              className="flex flex-col rounded-xl border border-border/50 bg-card/45 p-4 transition-all hover:border-border/80 hover:bg-card/75 shadow-lg min-w-0"
             >
               {/* Pattern Header */}
               <div className="flex items-start justify-between gap-2 border-b border-border/30 pb-2.5">
