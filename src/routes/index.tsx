@@ -716,9 +716,9 @@ function Index() {
                                   {resultObj.data.direction !== "NO_TRADE" ? (
                                     <p className={cn(
                                       "text-[10px] font-bold font-mono",
-                                      resultObj.data.score.combined >= 75 ? "text-bull" : resultObj.data.score.combined >= 60 ? "text-primary" : "text-muted-foreground"
+                                      (resultObj.data.finalScore || resultObj.data.confidence) >= 75 ? "text-bull" : (resultObj.data.finalScore || resultObj.data.confidence) >= 60 ? "text-primary" : "text-muted-foreground"
                                     )}>
-                                      {resultObj.data.score.combined}%
+                                      {resultObj.data.finalScore || resultObj.data.confidence}%
                                     </p>
                                   ) : (
                                     <p className="text-[10px] font-bold font-mono text-muted-foreground">N/A</p>
