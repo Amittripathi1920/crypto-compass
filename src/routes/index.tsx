@@ -79,6 +79,15 @@ function Index() {
   }, [browserErrors]);
 
   const [symbol, setSymbol] = useState<string>("BTC");
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+
+  const filteredCoins = useMemo(() => {
+    if (!symbol) return COINS;
+    const query = symbol.toUpperCase().trim();
+    return COINS.filter(
+      (c) => c.symbol.includes(query) || c.name.toUpperCase().includes(query)
+    );
+  }, [symbol]);
   const [timeframe, setTimeframe] = useState<Timeframe>("4h");
   const [provider, setProvider] = useState<ProviderId>("groq");
   const [model, setModel] = useState<string>("llama-3.3-70b-versatile");
@@ -264,18 +273,46 @@ function Index() {
                   <Input
                     type="text"
                     value={symbol}
-                    onChange={(e) => setSymbol(e.target.value.toUpperCase())}
-                    placeholder="E.g. BTC, SOL, DOGE"
-                    className="w-full uppercase bg-background/50 border-border focus:border-primary text-sm h-10"
-                    list="supported-coins-list"
+                    onChange={(e) => {
+                      setSymbol(e.target.value.toUpperCase());
+                      setDropdownOpen(true);
+                    }}
+                    onFocus={() => setDropdownOpen(true)}
+                    onBlur={() => {
+                      // Slight delay to let onMouseDown register choice
+                      setTimeout(() => setDropdownOpen(false), 200);
+                    }}
+                    placeholder="Search or enter custom ticker..."
+                    className="w-full uppercase bg-background/50 border-border focus:border-primary text-sm h-10 pr-10"
                   />
-                  <datalist id="supported-coins-list">
-                    {COINS.map((c) => (
-                      <option key={c.symbol} value={c.symbol}>
-                        {c.name}
-                      </option>
-                    ))}
-                  </datalist>
+                  <div className="absolute right-3 top-1/2 -translate-y-1/2 pointer-events-none text-muted-foreground">
+                    <ChevronDown className="h-4 w-4" />
+                  </div>
+                  
+                  {dropdownOpen && (
+                    <div className="absolute left-0 right-0 z-50 mt-1 max-h-60 overflow-y-auto rounded-md border border-border bg-card/95 p-1 text-popover-foreground shadow-md outline-none backdrop-blur-md animate-in fade-in-0 zoom-in-95">
+                      {filteredCoins.length > 0 ? (
+                        filteredCoins.map((c) => (
+                          <button
+                            key={c.symbol}
+                            type="button"
+                            onMouseDown={() => {
+                              setSymbol(c.symbol);
+                              setDropdownOpen(false);
+                            }}
+                            className="flex w-full cursor-pointer select-none items-center rounded-sm py-1.5 px-2 text-xs outline-none hover:bg-accent hover:text-accent-foreground text-left"
+                          >
+                            <span className="font-semibold text-foreground mr-1.5">{c.symbol}</span>
+                            <span className="text-muted-foreground font-normal">· {c.name}</span>
+                          </button>
+                        ))
+                      ) : (
+                        <div className="py-2 px-2 text-[10px] text-muted-foreground italic text-center">
+                          Press scan to analyze custom ticker "{symbol}"
+                        </div>
+                      )}
+                    </div>
+                  )}
                 </div>
               </div>
 
