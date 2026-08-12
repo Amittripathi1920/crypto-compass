@@ -1,8 +1,9 @@
-import React, { useEffect, useRef, useState } from "react";
+import { useMemo, useRef, useState } from "react";
 import type { Candle } from "../../lib/indicators";
 import type { DetectedPattern } from "../../lib/patterns";
 import { Button } from "@/components/ui/button";
-import { Download, AlertTriangle } from "lucide-react";
+import { Download } from "lucide-react";
+import { fmtPrice } from "./format";
 
 interface PatternChartProps {
   candles: Candle[];
@@ -10,263 +11,278 @@ interface PatternChartProps {
   isFullscreen?: boolean;
 }
 
+const W = 760;
+const PAD_R = 74;
+const PAD_T = 10;
+const PAD_B = 20;
+
+const resolveColor = (c: string) =>
+  c === "var(--bull)" ? "#0ecb81" : c === "var(--bear)" ? "#f6465d" : "#3b82f6";
+
 export function PatternChart({ candles, pattern, isFullscreen = false }: PatternChartProps) {
-  const chartContainerRef = useRef<HTMLDivElement>(null);
-  const chartInstanceRef = useRef<any>(null);
-  const [errorMsg, setErrorMsg] = useState<string | null>(null);
-  const [metaInfo, setMetaInfo] = useState<string>("");
+  const svgRef = useRef<SVGSVGElement>(null);
+  const [hover, setHover] = useState<number | null>(null);
 
-  const height = isFullscreen ? 380 : 200;
+  const H = isFullscreen ? 380 : 200;
+  const PLOT_H = H - PAD_T - PAD_B;
+  const PLOT_W = W - PAD_R;
 
-  useEffect(() => {
-    let active = true;
-    let chart: any = null;
-    let resizeObserver: ResizeObserver | null = null;
+  const model = useMemo(() => {
+    if (candles.length === 0) return null;
 
-    const initChart = async () => {
-      try {
-        if (!chartContainerRef.current) return;
+    // Focus window: from the earliest pattern feature (with lead-in) to the end
+    const idxs = [
+      ...pattern.points.map((p) => p.index),
+      ...pattern.lines.flatMap((l) => [l.startIndex, l.endIndex]),
+    ].filter((i) => Number.isFinite(i));
+    const minIdx = Math.max(0, Math.min(...(idxs.length ? idxs : [0])) - 6);
+    const view = candles.slice(minIdx);
+    if (view.length === 0) return null;
 
-        // Dynamic import to prevent Server-Side Rendering (SSR) crashes
-        const { createChart, ColorType, LineStyle } = await import("lightweight-charts");
+    const overlayPrices = [
+      ...pattern.points.map((p) => p.price),
+      ...pattern.lines.flatMap((l) => [l.startPrice, l.endPrice]),
+      pattern.targetPrice,
+      pattern.invalidPrice,
+    ].filter((v) => Number.isFinite(v));
 
-        if (!active || !chartContainerRef.current) return;
+    const highs = view.map((c) => c.high);
+    const lows = view.map((c) => c.low);
+    const rawMax = Math.max(...highs, ...overlayPrices);
+    const rawMin = Math.min(...lows, ...overlayPrices);
+    const span = rawMax - rawMin || Math.max(1e-8, rawMax * 0.01);
+    const top = rawMax + span * 0.08;
+    const bottom = rawMin - span * 0.08;
 
-        const convertTime = (t: number) => {
-          return t > 1000000000000 ? Math.floor(t / 1000) : t;
-        };
+    const y = (v: number) => ((top - v) / (top - bottom)) * PLOT_H + PAD_T;
+    const step = PLOT_W / view.length;
+    const x = (i: number) => (i - minIdx) * step + step / 2;
+    const ticks = [0, 0.25, 0.5, 0.75, 1].map((f) => top - f * (top - bottom));
 
-        const initialWidth = chartContainerRef.current.clientWidth || 500;
+    return { view, minIdx, y, x, step, ticks };
+  }, [candles, pattern, PLOT_H, PLOT_W]);
 
-        // Initialize chart
-        chart = createChart(chartContainerRef.current, {
-          width: initialWidth,
-          height: height,
-          layout: {
-            background: { type: ColorType.Solid, color: "#09090b" },
-            textColor: "#a1a1aa",
-            fontSize: 10,
-            fontFamily: "Inter, sans-serif",
-          },
-          grid: {
-            vertLines: { color: "#18181b" },
-            horzLines: { color: "#18181b" },
-          },
-          timeScale: {
-            borderVisible: false,
-            timeVisible: true,
-            secondsVisible: false,
-          },
-          rightPriceScale: {
-            borderVisible: false,
-            scaleMargins: {
-              top: 0.15,
-              bottom: 0.15,
-            },
-          },
-          crosshair: {
-            vertLine: {
-              color: "#3f3f46",
-              labelBackgroundColor: "#27272a",
-            },
-            horzLine: {
-              color: "#3f3f46",
-              labelBackgroundColor: "#27272a",
-            },
-          },
-        });
-
-        if (active) {
-          chartInstanceRef.current = chart;
-        } else {
-          chart.remove();
-          return;
-        }
-
-        // Create candlestick series
-        const candlestickSeries = chart.addCandlestickSeries({
-          upColor: "#0ecb81",
-          downColor: "#f6465d",
-          borderUpColor: "#0ecb81",
-          borderDownColor: "#f6465d",
-          wickUpColor: "#0ecb81",
-          wickDownColor: "#f6465d",
-        });
-
-        // Format, deduplicate, and sort candles by timestamp (Lightweight Charts strict rule)
-        const seenTimes = new Set<number>();
-        const formattedCandles = candles
-          .map((c) => ({
-            time: convertTime(c.time),
-            open: c.open,
-            high: c.high,
-            low: c.low,
-            close: c.close,
-          }))
-          .filter((c) => {
-            if (seenTimes.has(c.time)) return false;
-            seenTimes.add(c.time);
-            return true;
-          })
-          .sort((a, b) => a.time - b.time);
-
-        candlestickSeries.setData(formattedCandles);
-
-        // Overlay pattern geometric lines
-        pattern.lines.forEach((l) => {
-          const startCandle = candles[l.startIndex];
-          const endCandle = candles[l.endIndex];
-
-          if (startCandle && endCandle) {
-            const tStart = convertTime(startCandle.time);
-            const tEnd = convertTime(endCandle.time);
-
-            // Prevent zero-span lines as duplicate keys on the same series will crash the chart
-            if (tStart === tEnd) return;
-
-            const lineSeries = chart.addLineSeries({
-              color: l.color === "var(--bull)" ? "#0ecb81" : l.color === "var(--bear)" ? "#f6465d" : "#3b82f6",
-              lineWidth: 1.8,
-              lineStyle: l.style === "dashed" ? LineStyle.Dashed : LineStyle.Solid,
-              priceLineVisible: false,
-              lastValueVisible: false,
-            });
-
-            const dataPoints = [
-              { time: tStart as any, value: l.startPrice },
-              { time: tEnd as any, value: l.endPrice },
-            ].sort((a, b) => a.time - b.time);
-
-            lineSeries.setData(dataPoints);
-          }
-        });
-
-        // Setup point markers (Bottoms, Tops, Shoulder wicks) without duplicates
-        const seenMarkers = new Set<number>();
-        const markers = pattern.points
-          .map((p) => {
-            const candle = candles[p.index];
-            if (!candle) return null;
-
-            const timeSec = convertTime(candle.time);
-            if (seenMarkers.has(timeSec)) return null;
-            seenMarkers.add(timeSec);
-
-            const isLow = p.price < (candle.open + candle.close) / 2;
-            return {
-              time: timeSec as any,
-              position: isLow ? ("belowBar" as const) : ("aboveBar" as const),
-              color: p.label?.includes("Bottom") || p.label?.includes("Support") ? "#0ecb81" : p.label?.includes("Top") || p.label?.includes("Resistance") ? "#f6465d" : "#3b82f6",
-              shape: p.label?.includes("Bottom") || p.label?.includes(" t1") ? ("arrowUp" as const) : p.label?.includes("Top") || p.label?.includes(" peak") ? ("arrowDown" as const) : ("circle" as const),
-              text: p.label || "",
-            };
-          })
-          .filter((m): m is NonNullable<typeof m> => m !== null)
-          .sort((a, b) => (a.time as number) - (b.time as number));
-
-        candlestickSeries.setMarkers(markers);
-
-        // Auto-fit contents in viewport
-        chart.timeScale().fitContent();
-
-        // Resize listener
-        if (active && chartContainerRef.current) {
-          resizeObserver = new ResizeObserver(() => {
-            if (chart && chartContainerRef.current) {
-              chart.applyOptions({
-                width: chartContainerRef.current.clientWidth || 500,
-              });
-              chart.timeScale().fitContent();
-            }
-          });
-          resizeObserver.observe(chartContainerRef.current);
-        }
-      } catch (err) {
-        console.error("PatternChart init error:", err);
-        if (active) {
-          setErrorMsg(err instanceof Error ? err.stack || err.message : String(err));
-          setMetaInfo(
-            JSON.stringify(
-              {
-                candlesCount: candles.length,
-                firstCandle: candles[0] || null,
-                pattern: { name: pattern.name, lines: pattern.lines.length, points: pattern.points.length },
-              },
-              null,
-              2
-            )
-          );
-        }
-      }
-    };
-
-    initChart();
-
-    return () => {
-      active = false;
-      if (resizeObserver) resizeObserver.disconnect();
-      if (chart) {
-        chart.remove();
-      }
-      chartInstanceRef.current = null;
-    };
-  }, [candles, pattern, height]);
-
-  // Export Screenshot PNG
   const handleDownloadPNG = () => {
-    if (!chartInstanceRef.current) return;
-    const canvas = chartInstanceRef.current.takeScreenshot();
-    if (!canvas) return;
-
-    const url = canvas.toDataURL("image/png");
-    const link = document.createElement("a");
-    link.href = url;
-    link.download = `${pattern.name.toLowerCase().replace(/\s+/g, "_")}_chart.png`;
-    document.body.appendChild(link);
-    link.click();
-    document.body.removeChild(link);
+    const svg = svgRef.current;
+    if (!svg) return;
+    const xml = new XMLSerializer().serializeToString(svg);
+    const img = new Image();
+    img.onload = () => {
+      const canvas = document.createElement("canvas");
+      canvas.width = W * 2;
+      canvas.height = H * 2;
+      const ctx = canvas.getContext("2d");
+      if (!ctx) return;
+      ctx.fillStyle = "#09090b";
+      ctx.fillRect(0, 0, canvas.width, canvas.height);
+      ctx.drawImage(img, 0, 0, canvas.width, canvas.height);
+      const link = document.createElement("a");
+      link.href = canvas.toDataURL("image/png");
+      link.download = `${pattern.name.toLowerCase().replace(/\s+/g, "_")}_chart.png`;
+      document.body.appendChild(link);
+      link.click();
+      document.body.removeChild(link);
+    };
+    img.src = "data:image/svg+xml;base64," + btoa(unescape(encodeURIComponent(xml)));
   };
 
+  if (!model) {
+    return (
+      <div
+        className="flex items-center justify-center rounded-lg border border-border/40 bg-background/90 text-[10px] uppercase tracking-widest text-muted-foreground"
+        style={{ height: `${H}px` }}
+      >
+        No candle data
+      </div>
+    );
+  }
+
+  const { view, minIdx, y, x, step, ticks } = model;
+  const bodyW = Math.max(1.4, step * 0.62);
+  const active = hover !== null ? view[hover] : undefined;
+
+  const clampX = (i: number) => Math.min(PLOT_W - 1, Math.max(1, x(i)));
+
   return (
-    <div className="flex flex-col space-y-2 w-full text-left">
-      {errorMsg ? (
-        <div
-          className="rounded-lg border border-red-500/20 bg-red-500/5 p-3 text-[10px] font-mono text-red-400 space-y-2 flex flex-col justify-center"
-          style={{ minHeight: `${height}px` }}
+    <div className="flex w-full flex-col space-y-2 text-left">
+      <div className="relative w-full overflow-hidden rounded-lg border border-border/40 bg-background/90">
+        <svg
+          ref={svgRef}
+          viewBox={`0 0 ${W} ${H}`}
+          width="100%"
+          height={H}
+          preserveAspectRatio="none"
+          onMouseLeave={() => setHover(null)}
+          onMouseMove={(e) => {
+            const rect = e.currentTarget.getBoundingClientRect();
+            const px = ((e.clientX - rect.left) / rect.width) * W;
+            if (px > PLOT_W) return setHover(null);
+            const i = Math.floor(px / step);
+            setHover(i >= 0 && i < view.length ? i : null);
+          }}
         >
-          <div className="flex items-center gap-1.5 text-red-400 font-bold text-xs">
-            <AlertTriangle className="h-4 w-4 text-red-400" />
-            Chart Render Failure
-          </div>
-          <pre className="bg-black/40 p-2 rounded overflow-auto max-h-24 whitespace-pre-wrap border border-red-500/10">
-            {errorMsg}
-          </pre>
-          <p className="font-bold uppercase tracking-wider text-[8px] text-muted-foreground pt-1">
-            Data Payload Snapshot:
-          </p>
-          <pre className="bg-black/40 p-2 rounded overflow-auto max-h-24 border border-red-500/10">
-            {metaInfo}
-          </pre>
-        </div>
-      ) : (
-        <div
-          ref={chartContainerRef}
-          className="w-full rounded-lg border border-border/40 bg-background/90 overflow-hidden relative"
-          style={{ height: `${height}px` }}
-        />
-      )}
-      {!errorMsg && (
-        <div className="flex justify-end pt-1">
-          <Button
-            variant="ghost"
-            size="sm"
-            onClick={handleDownloadPNG}
-            className="text-[10px] uppercase font-bold tracking-wider text-muted-foreground hover:text-foreground h-6 px-2"
+          {/* grid + price axis */}
+          {ticks.map((t, i) => (
+            <g key={`t${i}`}>
+              <line x1={0} x2={PLOT_W} y1={y(t)} y2={y(t)} stroke="#18181b" strokeWidth={1} />
+              <text x={PLOT_W + 6} y={y(t) + 3} fill="#71717a" fontSize={9} fontFamily="monospace">
+                {fmtPrice(t)}
+              </text>
+            </g>
+          ))}
+
+          {/* candles */}
+          {view.map((c, i) => {
+            const up = c.close >= c.open;
+            const col = up ? "#0ecb81" : "#f6465d";
+            const cx = i * step + step / 2;
+            const yo = y(c.open);
+            const yc = y(c.close);
+            return (
+              <g key={c.time + "-" + i}>
+                <line x1={cx} x2={cx} y1={y(c.high)} y2={y(c.low)} stroke={col} strokeWidth={1} />
+                <rect
+                  x={cx - bodyW / 2}
+                  y={Math.min(yo, yc)}
+                  width={bodyW}
+                  height={Math.max(1, Math.abs(yc - yo))}
+                  fill={col}
+                />
+              </g>
+            );
+          })}
+
+          {/* target / invalidation levels */}
+          {[
+            { v: pattern.targetPrice, label: "TGT", color: "#0ecb81" },
+            { v: pattern.invalidPrice, label: "INV", color: "#f6465d" },
+          ]
+            .filter((l) => Number.isFinite(l.v))
+            .map((l) => (
+              <g key={l.label}>
+                <line
+                  x1={0}
+                  x2={PLOT_W}
+                  y1={y(l.v)}
+                  y2={y(l.v)}
+                  stroke={l.color}
+                  strokeWidth={1}
+                  strokeDasharray="2 4"
+                  opacity={0.8}
+                />
+                <text x={PLOT_W + 6} y={y(l.v) - 3} fill={l.color} fontSize={8} fontFamily="monospace">
+                  {l.label}
+                </text>
+              </g>
+            ))}
+
+          {/* pattern lines */}
+          {pattern.lines.map((l, i) => {
+            const c = resolveColor(l.color);
+            const x1 = clampX(l.startIndex);
+            const x2 = clampX(l.endIndex);
+            return (
+              <line
+                key={`l${i}`}
+                x1={x1}
+                x2={Math.abs(x2 - x1) < 2 ? x1 + 2 : x2}
+                y1={y(l.startPrice)}
+                y2={y(l.endPrice)}
+                stroke={c}
+                strokeWidth={1.6}
+                strokeDasharray={l.style === "dashed" ? "5 4" : undefined}
+                strokeLinecap="round"
+              />
+            );
+          })}
+
+          {/* pattern points */}
+          {pattern.points.map((p, i) => {
+            const candle = candles[p.index];
+            if (!candle) return null;
+            const px = clampX(p.index);
+            const py = y(p.price);
+            const isLow = p.price < (candle.open + candle.close) / 2;
+            const col = /Bottom|Support|Base/i.test(p.label ?? "")
+              ? "#0ecb81"
+              : /Top|Resistance|Head|Shoulder/i.test(p.label ?? "")
+                ? "#f6465d"
+                : "#3b82f6";
+            return (
+              <g key={`p${i}`}>
+                <circle cx={px} cy={py} r={2.6} fill={col} stroke="#09090b" strokeWidth={0.8} />
+                {p.label ? (
+                  <text
+                    x={px}
+                    y={isLow ? py + 12 : py - 6}
+                    fill={col}
+                    fontSize={8}
+                    fontFamily="monospace"
+                    textAnchor="middle"
+                  >
+                    {p.label}
+                  </text>
+                ) : null}
+              </g>
+            );
+          })}
+
+          {/* crosshair */}
+          {hover !== null && view[hover] ? (
+            <line
+              x1={hover * step + step / 2}
+              x2={hover * step + step / 2}
+              y1={PAD_T}
+              y2={PAD_T + PLOT_H}
+              stroke="#3f3f46"
+              strokeWidth={1}
+              strokeDasharray="3 3"
+            />
+          ) : null}
+
+          {/* time labels */}
+          <text x={2} y={H - 6} fill="#52525b" fontSize={8} fontFamily="monospace">
+            {new Date(view[0]!.time).toLocaleDateString()}
+          </text>
+          <text
+            x={PLOT_W - 2}
+            y={H - 6}
+            fill="#52525b"
+            fontSize={8}
+            fontFamily="monospace"
+            textAnchor="end"
           >
-            <Download className="mr-1.5 h-3 w-3" /> Save Chart PNG
-          </Button>
-        </div>
-      )}
+            {new Date(view[view.length - 1]!.time).toLocaleDateString()}
+          </text>
+        </svg>
+
+        {active ? (
+          <div className="pointer-events-none absolute left-2 top-2 rounded border border-border/60 bg-background/95 px-2 py-1 font-mono text-[9px] leading-tight text-muted-foreground">
+            <div>{new Date(active.time).toLocaleString()}</div>
+            <div>
+              O {fmtPrice(active.open)} H {fmtPrice(active.high)}
+            </div>
+            <div>
+              L {fmtPrice(active.low)} C {fmtPrice(active.close)}
+            </div>
+          </div>
+        ) : (
+          <div className="pointer-events-none absolute left-2 top-2 font-mono text-[9px] uppercase tracking-widest text-muted-foreground/70">
+            {pattern.name} · {view.length} candles · idx {minIdx}+
+          </div>
+        )}
+      </div>
+
+      <div className="flex justify-end pt-1">
+        <Button
+          variant="ghost"
+          size="sm"
+          onClick={handleDownloadPNG}
+          className="h-6 px-2 text-[10px] font-bold uppercase tracking-wider text-muted-foreground hover:text-foreground"
+        >
+          <Download className="mr-1.5 h-3 w-3" /> Save Chart PNG
+        </Button>
+      </div>
     </div>
   );
 }
