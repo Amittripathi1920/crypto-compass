@@ -8,7 +8,7 @@ import { eq, and, inArray, desc } from "drizzle-orm";
 const TrackedTradeSchema = z.object({
   id: z.string(),
   symbol: z.string(),
-  timeframe: z.enum(["4h", "8h", "1d", "1w"]),
+  timeframe: z.enum(["5m", "15m", "1h", "4h", "8h", "1d", "1w"]),
   direction: z.enum(["LONG", "SHORT"]),
   entry: z.number(),
   stopLoss: z.number(),

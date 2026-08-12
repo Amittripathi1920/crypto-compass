@@ -141,6 +141,9 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
 
 function getTimeframeMs(tf: string): number {
   switch (tf) {
+    case "5m": return 5 * 60 * 1000;
+    case "15m": return 15 * 60 * 1000;
+    case "1h": return 60 * 60 * 1000;
     case "4h": return 4 * 60 * 60 * 1000;
     case "8h": return 8 * 60 * 60 * 1000;
     case "1d": return 24 * 60 * 60 * 1000;

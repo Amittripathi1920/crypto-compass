@@ -79,9 +79,13 @@ function Index() {
 
   const [symbol, setSymbol] = useState<string>("BTC");
   const [timeframe, setTimeframe] = useState<Timeframe>("4h");
-  const [provider, setProvider] = useState<ProviderId>("lovable");
-  const [model, setModel] = useState<string>(PROVIDERS[0]!.defaultModel);
+  const [provider, setProvider] = useState<ProviderId>("groq");
+  const [model, setModel] = useState<string>("llama-3.3-70b-versatile");
   const [apiKey, setApiKey] = useState<string>("");
+  const [minScore, setMinScore] = useState(60);
+  const [minRR, setMinRR] = useState(1.5);
+  const [atrMult, setAtrMult] = useState(1.5);
+  const [pivotStr, setPivotStr] = useState(4);
 
   useEffect(() => {
     try {
@@ -121,6 +125,14 @@ function Index() {
           provider,
           model: model || undefined,
           apiKey: activeProvider.needsKey ? apiKey.trim() : undefined,
+          config: {
+            minimumScore: minScore,
+            minimumSetupScore: minScore,
+            minimumEntryScore: minScore,
+            minimumRR: minRR,
+            atrMultiplier: atrMult,
+            pivotStrength: pivotStr,
+          }
         },
       }),
   });
@@ -135,7 +147,7 @@ function Index() {
       }),
   });
 
-  const keyMissing = activeProvider.needsKey && apiKey.trim().length === 0;
+  const keyMissing = false;
   const errorMessage =
     mutation.error instanceof Error ? mutation.error.message : mutation.error ? "Analysis failed." : "";
   const [errorHeadline, ...errorDetails] = errorMessage.split("\n");
@@ -164,7 +176,13 @@ function Index() {
                 </span>
               </div>
               {/* User Session Profile Controls */}
-              <div>
+              <div className="flex items-center gap-4">
+                <Link
+                  to="/backtest"
+                  className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:text-foreground transition-colors"
+                >
+                  Backtesting
+                </Link>
                 {sessionData?.user ? (
                   <UserNav />
                 ) : (
@@ -321,6 +339,79 @@ function Index() {
                   {activeProvider.keyHint}
                 </p>
               )}
+            </div>
+
+            {/* Collapsible Strategy Settings */}
+            <div className="mt-3.5 pt-3.5 border-t border-border/30">
+              <details className="group cursor-pointer select-none">
+                <summary className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold flex items-center gap-1.5 hover:text-foreground transition-colors">
+                  <span>🛠️ Strategy Engine Parameters</span>
+                  <span className="text-[8px] opacity-75 font-normal tracking-normal group-open:hidden">(Click to Expand)</span>
+                  <span className="text-[8px] opacity-75 font-normal tracking-normal hidden group-open:inline">(Click to Collapse)</span>
+                </summary>
+                <div className="grid gap-4 sm:grid-cols-2 md:grid-cols-4 pt-3.5 pl-1.5 cursor-default" onClick={(e) => e.stopPropagation()}>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-muted-foreground">
+                      <span>Min Confluence</span>
+                      <span className="text-foreground font-bold font-mono">{minScore}</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="40"
+                      max="90"
+                      step="5"
+                      value={minScore}
+                      onChange={(e) => setMinScore(parseInt(e.target.value))}
+                      className="w-full accent-primary h-1 rounded-full bg-muted cursor-pointer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-muted-foreground">
+                      <span>Min Risk/Reward</span>
+                      <span className="text-foreground font-bold font-mono">{minRR.toFixed(1)}R</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="3.0"
+                      step="0.1"
+                      value={minRR}
+                      onChange={(e) => setMinRR(parseFloat(e.target.value))}
+                      className="w-full accent-primary h-1 rounded-full bg-muted cursor-pointer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-muted-foreground">
+                      <span>ATR Stop Buffer</span>
+                      <span className="text-foreground font-bold font-mono">{atrMult.toFixed(2)}x</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="1.0"
+                      max="2.5"
+                      step="0.05"
+                      value={atrMult}
+                      onChange={(e) => setAtrMult(parseFloat(e.target.value))}
+                      className="w-full accent-primary h-1 rounded-full bg-muted cursor-pointer"
+                    />
+                  </div>
+                  <div className="space-y-1">
+                    <div className="flex justify-between items-center text-[9px] uppercase tracking-wider text-muted-foreground">
+                      <span>Pivot Bars</span>
+                      <span className="text-foreground font-bold font-mono">{pivotStr} bars</span>
+                    </div>
+                    <input
+                      type="range"
+                      min="2"
+                      max="8"
+                      step="1"
+                      value={pivotStr}
+                      onChange={(e) => setPivotStr(parseInt(e.target.value))}
+                      className="w-full accent-primary h-1 rounded-full bg-muted cursor-pointer"
+                    />
+                  </div>
+                </div>
+              </details>
             </div>
 
             <div className="mt-5 flex flex-col sm:flex-row gap-3 w-full">

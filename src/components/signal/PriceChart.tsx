@@ -1,10 +1,13 @@
 import { useMemo, useState } from "react";
-import { ema, type Candle, rsiSeries } from "@/lib/indicators";
+import { ema, type Candle, rsiSeries, atr } from "@/lib/indicators";
 import { fmtPrice } from "./format";
 import { Dialog, DialogContent, DialogTrigger, DialogTitle } from "@/components/ui/dialog";
 import { Button } from "@/components/ui/button";
 import { Maximize2 } from "lucide-react";
 import { cn } from "@/lib/utils";
+import { MarketStructureEngine } from "@/lib/engine/MarketStructureEngine";
+import { ZoneEngine } from "@/lib/engine/ZoneEngine";
+import { LiquidityEngine } from "@/lib/engine/LiquidityEngine";
 
 type Level = { label: string; value: number; color: string };
 
@@ -34,6 +37,19 @@ export function PriceChartInner({
 }) {
   const [hover, setHover] = useState<number | null>(null);
   const [mouseY, setMouseY] = useState<number | null>(null);
+
+  // Compute Confluence Engine annotations dynamically on the client
+  const annotations = useMemo(() => {
+    if (candles.length === 0) return null;
+    const atrVal = atr(candles) || candles[candles.length - 1]!.close * 0.01;
+    const structure = MarketStructureEngine.detect(candles, 4);
+    const zonesList = ZoneEngine.detectZones(candles, structure.swings, atrVal);
+    const fvgsList = ZoneEngine.detectFVGs(candles);
+    const liquidityList = LiquidityEngine.mapLiquidity(candles, [], structure.swings, atrVal);
+    const sweep = LiquidityEngine.detectSweep(candles, liquidityList, atrVal);
+    
+    return { structure, zones: zonesList, fvgs: fvgsList, sweep };
+  }, [candles]);
 
   const model = useMemo(() => {
     if (candles.length === 0) return null;
@@ -66,7 +82,7 @@ export function PriceChartInner({
     if (!model) return null;
     const eL = levels.find((l) => l.label === "E");
     const slL = levels.find((l) => l.label === "SL");
-    const t2L = levels.find((l) => l.label === "T2");
+    const t2L = levels.find((l) => l.label === "T2") || levels.find((l) => l.label === "T3");
 
     if (!eL || !slL || !t2L) return null;
 
@@ -188,6 +204,61 @@ export function PriceChartInner({
           />
         ) : null}
 
+        {/* Supply / Demand Zones in background */}
+        {annotations && annotations.zones.map((z) => {
+          const topY = y(z.topPrice);
+          const bottomY = y(z.bottomPrice);
+          const hHeight = Math.abs(bottomY - topY);
+          const startIdx = candles.findIndex((c) => c.time === z.time);
+          const startX = startIdx !== -1 ? x(startIdx) : 0;
+          const zoneWidth = PLOT_W - startX;
+          if (zoneWidth <= 0 || hHeight <= 0) return null;
+          const isDemand = z.type === "DEMAND";
+          
+          return (
+            <rect
+              key={z.id}
+              x={startX}
+              y={Math.min(topY, bottomY)}
+              width={zoneWidth}
+              height={hHeight}
+              fill={isDemand ? "var(--bull)" : "var(--bear)"}
+              opacity={0.06}
+              stroke={isDemand ? "var(--bull)" : "var(--bear)"}
+              strokeWidth={0.5}
+              strokeOpacity={0.3}
+            />
+          );
+        })}
+
+        {/* FVGs in background */}
+        {annotations && annotations.fvgs.map((f, idx) => {
+          const topY = y(f.topPrice);
+          const bottomY = y(f.bottomPrice);
+          const hHeight = Math.abs(bottomY - topY);
+          const startIdx = candles.findIndex((c) => c.time === f.time);
+          const startX = startIdx !== -1 ? x(startIdx) : 0;
+          const zoneWidth = PLOT_W - startX;
+          if (zoneWidth <= 0 || hHeight <= 0) return null;
+          const isBull = f.direction === "BULLISH";
+          
+          return (
+            <rect
+              key={`fvg_${idx}`}
+              x={startX}
+              y={Math.min(topY, bottomY)}
+              width={zoneWidth}
+              height={hHeight}
+              fill={isBull ? "#3b82f6" : "#f97316"}
+              opacity={0.04}
+              stroke={isBull ? "#3b82f6" : "#f97316"}
+              strokeWidth={0.5}
+              strokeDasharray="2 2"
+              strokeOpacity={0.25}
+            />
+          );
+        })}
+
         {/* Risk/Reward translucent zones */}
         {rrZones ? (
           <>
@@ -290,6 +361,111 @@ export function PriceChartInner({
           filter="url(#ema50Glow)"
           opacity={0.9}
         />
+
+        {/* BOS & CHoCH Lines */}
+        {annotations && annotations.structure.bos.map((b, idx) => {
+          const ly = y(b.price);
+          const startIdx = b.sourceSwingIndex;
+          const startX = startIdx >= 0 && startIdx < candles.length ? x(startIdx) : 0;
+          return (
+            <g key={`bos_${idx}`}>
+              <line
+                x1={startX}
+                x2={PLOT_W}
+                y1={ly}
+                y2={ly}
+                stroke={b.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                strokeWidth={0.75}
+                strokeDasharray="3 3"
+                opacity={0.5}
+              />
+              <text
+                x={startX + 5}
+                y={ly - 3}
+                fill={b.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                fontSize={8}
+                fontWeight={500}
+                opacity={0.7}
+              >
+                BOS
+              </text>
+            </g>
+          );
+        })}
+
+        {annotations && annotations.structure.choch.map((c, idx) => {
+          const ly = y(c.price);
+          const startIdx = c.sourceSwingIndex;
+          const startX = startIdx >= 0 && startIdx < candles.length ? x(startIdx) : 0;
+          return (
+            <g key={`choch_${idx}`}>
+              <line
+                x1={startX}
+                x2={PLOT_W}
+                y1={ly}
+                y2={ly}
+                stroke={c.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                strokeWidth={0.75}
+                strokeDasharray="3 3"
+                opacity={0.5}
+              />
+              <text
+                x={startX + 5}
+                y={ly - 3}
+                fill={c.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                fontSize={8}
+                fontWeight={500}
+                opacity={0.7}
+              >
+                CHoCH
+              </text>
+            </g>
+          );
+        })}
+
+        {/* Swing Points */}
+        {annotations && annotations.structure.swings.map((s, idx) => {
+          const cx = x(s.index);
+          const cy = s.type === "high" ? y(s.price) - 5 : y(s.price) + 5;
+          return (
+            <circle
+              key={`swing_${idx}`}
+              cx={cx}
+              cy={cy}
+              r={2.5}
+              stroke="var(--neutral)"
+              strokeWidth={0.5}
+              fill="none"
+              opacity={0.4}
+            />
+          );
+        })}
+
+        {/* Liquidity Sweeps */}
+        {annotations && annotations.sweep && (
+          <g>
+            <line
+              x1={0}
+              x2={PLOT_W}
+              y1={y(annotations.sweep.sweptLevelPrice)}
+              y2={y(annotations.sweep.sweptLevelPrice)}
+              stroke="#eab308"
+              strokeWidth={1}
+              strokeDasharray="4 4"
+              opacity={0.6}
+            />
+            <text
+              x={10}
+              y={y(annotations.sweep.sweptLevelPrice) - 4}
+              fill="#eab308"
+              fontSize={8.5}
+              fontWeight="bold"
+              opacity={0.8}
+            >
+              SWEEP ({annotations.sweep.sweptLevelType})
+            </text>
+          </g>
+        )}
 
         {levels.map((l) => {
           const ly = y(l.value);
@@ -477,7 +653,8 @@ export function PriceChartInner({
             fontFamily="var(--font-mono-num)"
             opacity={0.8}
           >
-            {new Date(candles[i]!.time).toLocaleString(undefined, {
+            {new Date(candles[i]!.time).toLocaleDateString("en-US", {
+              timeZone: "UTC",
               month: "short",
               day: "numeric",
               hour: "2-digit",

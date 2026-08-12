@@ -168,6 +168,52 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               )}
             </Button>
           </form>
+
+          <div className="relative flex py-3 items-center">
+            <div className="flex-grow border-t border-border/40"></div>
+            <span className="flex-shrink mx-3 text-[9px] text-muted-foreground uppercase tracking-widest font-semibold">Or continue with</span>
+            <div className="flex-grow border-t border-border/40"></div>
+          </div>
+
+          <Button
+            type="button"
+            variant="outline"
+            disabled={loading}
+            onClick={async () => {
+              setLoading(true);
+              try {
+                await signIn.social({
+                  provider: "google",
+                  callbackURL: window.location.href,
+                });
+              } catch (err: any) {
+                console.error("[auth] Google sign in failed:", err);
+                toast.error(err.message || "Failed to sign in with Google.");
+                setLoading(false);
+              }
+            }}
+            className="w-full h-9 border border-border bg-background/50 text-xs font-semibold uppercase tracking-wider hover:bg-accent text-foreground gap-2"
+          >
+            <svg className="h-3.5 w-3.5" viewBox="0 0 24 24">
+              <path
+                fill="#EA4335"
+                d="M12 5.04c1.66 0 3.2.57 4.38 1.69l3.27-3.27C17.67 1.48 14.99 1 12 1 7.24 1 3.2 3.73 1.24 7.74l3.86 3c.92-2.77 3.5-4.7 6.9-4.7z"
+              />
+              <path
+                fill="#4285F4"
+                d="M23.49 12.27c0-.81-.07-1.59-.2-2.36H12v4.51h6.44c-.28 1.46-1.1 2.7-2.33 3.53l3.6 2.79c2.1-1.94 3.78-4.79 3.78-8.47z"
+              />
+              <path
+                fill="#FBBC05"
+                d="M5.1 14.74c-.24-.72-.38-1.49-.38-2.29s.14-1.57.38-2.29L1.24 7.74C.45 9.36 0 11.13 0 13s.45 3.64 1.24 5.26l3.86-3.02z"
+              />
+              <path
+                fill="#34A853"
+                d="M12 23c3.24 0 5.97-1.07 7.96-2.91l-3.6-2.79c-1.1.74-2.52 1.18-4.36 1.18-3.4 0-5.98-1.93-6.9-4.7l-3.86 3.02C3.2 20.27 7.24 23 12 23z"
+              />
+            </svg>
+            Google
+          </Button>
         </Tabs>
       </DialogContent>
     </Dialog>

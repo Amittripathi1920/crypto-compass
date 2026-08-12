@@ -1,6 +1,9 @@
-export type Timeframe = "4h" | "8h" | "1d" | "1w";
+export type Timeframe = "5m" | "15m" | "1h" | "4h" | "8h" | "1d" | "1w";
 
 export const TIMEFRAMES: { value: Timeframe; label: string; horizon: string }[] = [
+  { value: "5m", label: "5M", horizon: "scalp (1-2 hours)" },
+  { value: "15m", label: "15M", horizon: "intraday (4-12 hours)" },
+  { value: "1h", label: "1H", horizon: "day trade (12-36 hours)" },
   { value: "4h", label: "4H", horizon: "swing (3-7 days)" },
   { value: "8h", label: "8H", horizon: "extended swing (5-10 days)" },
   { value: "1d", label: "1D", horizon: "position (2-6 weeks)" },

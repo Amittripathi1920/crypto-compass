@@ -7,6 +7,7 @@ export type SignalRequest = {
   provider: ProviderId;
   model?: string | undefined;
   apiKey?: string | undefined;
+  config?: any;
 };
 
 export type SignalResult = {
@@ -31,9 +32,14 @@ export type SignalResult = {
   stopLoss: number;
   target1: number;
   target2: number;
+  target3?: number;
+  setupScore?: number;
+  entryScore?: number;
+  finalScore?: number;
   riskReward: number;
   summary: string;
   reasoning: { label: string; detail: string }[];
+  rejectionReasons?: string[];
   invalidation: string;
   indicators: {
     rsi: number;

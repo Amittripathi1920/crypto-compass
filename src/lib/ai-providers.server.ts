@@ -67,12 +67,28 @@ const ADAPTERS: Record<ProviderId, ProviderAdapter> = {
 
 export async function runChat(args: ChatArgs): Promise<string> {
   const adapter = ADAPTERS[args.provider];
-  const key = args.provider === "lovable" ? process.env['LOVABLE_API_KEY'] : args.apiKey;
+  
+  // Resolve key: client-provided key has priority, fall back to environment variables
+  let key = args.apiKey?.trim();
+  if (!key) {
+    if (args.provider === "lovable") {
+      key = process.env["LOVABLE_API_KEY"];
+    } else if (args.provider === "groq") {
+      key = process.env["GROQ_API_KEY"];
+    } else if (args.provider === "openai") {
+      key = process.env["OPENAI_API_KEY"];
+    } else if (args.provider === "google") {
+      key = process.env["GEMINI_API_KEY"] || process.env["GOOGLE_API_KEY"];
+    } else if (args.provider === "anthropic") {
+      key = process.env["ANTHROPIC_API_KEY"];
+    }
+  }
+
   if (!key) {
     throw new Error(
       args.provider === "lovable"
         ? "The built-in AI is not configured."
-        : "An API key is required for this provider.",
+        : `An API key is required for ${args.provider}. Please input it in the key field or configure the ${args.provider.toUpperCase()}_API_KEY environment variable.`,
     );
   }
 

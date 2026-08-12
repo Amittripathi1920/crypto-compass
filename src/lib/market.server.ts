@@ -18,7 +18,15 @@ async function getJson(url: string): Promise<unknown> {
 const num = (v: unknown) => Number(v);
 
 /* ---------------- OKX ---------------- */
-const OKX_BAR: Record<Timeframe, string> = { "4h": "4H", "8h": "8H", "1d": "1D", "1w": "1W" };
+const OKX_BAR: Record<Timeframe, string> = {
+  "5m": "5m",
+  "15m": "15m",
+  "1h": "1H",
+  "4h": "4H",
+  "8h": "8H",
+  "1d": "1D",
+  "1w": "1W"
+};
 
 async function okxCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
   const json = (await getJson(
@@ -100,7 +108,15 @@ async function binanceTicker(symbol: string): Promise<Ticker> {
 }
 
 /* ---------------- Kraken ---------------- */
-const KRAKEN_INTERVAL: Record<Timeframe | "1h", number> = { "4h": 240, "8h": 480, "1d": 1440, "1w": 10080, "1h": 60 };
+const KRAKEN_INTERVAL: Record<Timeframe, number> = {
+  "5m": 5,
+  "15m": 15,
+  "1h": 60,
+  "4h": 240,
+  "8h": 480,
+  "1d": 1440,
+  "1w": 10080
+};
 const krakenAsset = (s: string) => (s === "BTC" ? "XBT" : s === "DOGE" ? "XDG" : s);
 
 async function krakenCandles(symbol: string, tf: Timeframe | "1h"): Promise<Candle[]> {
@@ -186,16 +202,16 @@ export async function fetchCandles(
   interval: Timeframe,
 ): Promise<Sourced<Candle[]>> {
   return firstOk(`${symbol} ${interval} candles`, [
-    { exchange: "OKX", run: () => okxCandles(symbol, interval) },
     { exchange: "Binance", run: () => binanceCandles(symbol, interval) },
+    { exchange: "OKX", run: () => okxCandles(symbol, interval) },
     { exchange: "Kraken", run: () => krakenCandles(symbol, interval) },
   ]);
 }
 
 export async function fetchTicker(symbol: string): Promise<Sourced<Ticker>> {
   return firstOk(`${symbol} ticker`, [
-    { exchange: "OKX", run: () => okxTicker(symbol) },
     { exchange: "Binance", run: () => binanceTicker(symbol) },
+    { exchange: "OKX", run: () => okxTicker(symbol) },
     { exchange: "Kraken", run: async () => tickerFromCandles(await krakenCandles(symbol, "1h")) },
   ]);
 }
