@@ -33,7 +33,9 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
     // Focus window: pattern structure only (ignore long projection tails), plus a trailing buffer
     const structureIdxs = [
       ...pattern.points.map((p) => p.index),
-      ...pattern.lines.flatMap((l) => [l.startIndex, l.endIndex]),
+      ...pattern.lines
+        .filter((l) => !/projection|target/i.test(l.label))
+        .flatMap((l) => [l.startIndex, l.endIndex]),
     ].filter((i) => Number.isFinite(i) && i >= 0 && i < candles.length);
     const base = structureIdxs.length ? structureIdxs : [0, candles.length - 1];
     const structMin = Math.min(...base);
