@@ -145,15 +145,17 @@ function Index() {
 
   useEffect(() => {
     try {
-      const savedProvider = localStorage.getItem("cc_prev_provider");
+      const savedProvider = (localStorage.getItem("cc_prev_provider") as ProviderId) || "groq";
       if (savedProvider) {
-        setProvider(savedProvider as ProviderId);
+        setProvider(savedProvider);
         const savedModel = localStorage.getItem("cc_prev_model");
         if (savedModel) {
           setModel(savedModel);
         } else {
-          setModel(providerById(savedProvider as ProviderId).defaultModel);
+          setModel(providerById(savedProvider).defaultModel);
         }
+        const savedKey = localStorage.getItem(`cc_api_key_${savedProvider}`) || "";
+        setApiKey(savedKey);
       }
     } catch {
       // Ignore localStorage errors in sandboxes/private browsing
@@ -343,6 +345,8 @@ function Index() {
                     try {
                       localStorage.setItem("cc_prev_provider", next);
                       localStorage.setItem("cc_prev_model", nextModel);
+                      const savedKey = localStorage.getItem(`cc_api_key_${next}`) || "";
+                      setApiKey(savedKey);
                     } catch {
                       // ignore localStorage failure
                     }
@@ -389,21 +393,39 @@ function Index() {
                 </Select>
               </div>
 
-              {activeProvider.needsKey ? (
+              {activeProvider.needsKey || activeProvider.id === "groq" ? (
                 <div className="space-y-1.5 md:col-span-2">
                   <Label className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
                     <KeyRound className="h-3 w-3" /> {activeProvider.label} API key
+                    {activeProvider.id === "groq" && (
+                      <span className="text-[9px] lowercase text-emerald-400 font-normal">
+                        (optional - default key active)
+                      </span>
+                    )}
                   </Label>
                   <Input
                     type="password"
                     value={apiKey}
-                    onChange={(e) => setApiKey(e.target.value)}
+                    onChange={(e) => {
+                      const val = e.target.value;
+                      setApiKey(val);
+                      try {
+                        if (val.trim()) {
+                          localStorage.setItem(`cc_api_key_${provider}`, val.trim());
+                        } else {
+                          localStorage.removeItem(`cc_api_key_${provider}`);
+                        }
+                      } catch {
+                        // ignore localStorage failure
+                      }
+                    }}
                     placeholder={activeProvider.keyHint}
                     autoComplete="off"
                   />
                   <p className="text-[10px] text-muted-foreground">
-                    🔒 Secret keys are held in memory for this session only and never written to
-                    storage.
+                    {activeProvider.id === "groq"
+                      ? "⚡ Built-in Groq key is used automatically if left empty. Your custom key is saved locally in browser storage."
+                      : "💾 Your API key is saved locally in your browser storage for future sessions."}
                   </p>
                 </div>
               ) : (

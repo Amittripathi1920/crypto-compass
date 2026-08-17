@@ -80,7 +80,7 @@ export const PROVIDERS: {
   {
     id: "groq",
     label: "Groq",
-    needsKey: true,
+    needsKey: false,
     defaultModel: "llama-3.3-70b-versatile",
     models: [
       "llama-3.3-70b-versatile",
@@ -93,7 +93,7 @@ export const PROVIDERS: {
       "gemma2-9b-it",
       "deepseek-r1-distill-llama-70b",
     ],
-    keyHint: "gsk_... from console.groq.com",
+    keyHint: "Built-in server Groq key is active. Optional: enter custom gsk_... to override.",
   },
 ];
 
