@@ -1,13 +1,13 @@
 import { createContext, useContext, useEffect, useState } from "react";
 import { useServerFn } from "@tanstack/react-start";
 import { useSession, getJWTToken } from "@/lib/auth-client";
-import { 
-  validateTrades, 
-  getUserTrades, 
-  syncUserTrades, 
-  dbTrackTrade, 
-  dbCancelTrade, 
-  dbRemoveTrade 
+import {
+  validateTrades,
+  getUserTrades,
+  syncUserTrades,
+  dbTrackTrade,
+  dbCancelTrade,
+  dbRemoveTrade,
 } from "@/lib/tracker.functions";
 import type { TrackedTrade, TradeStatus } from "@/lib/tracker-types";
 import { toast } from "sonner";
@@ -18,7 +18,9 @@ interface TradeTrackerContextType {
   trades: TrackedTrade[];
   isValidating: boolean;
   isLoggedIn: boolean;
-  trackTrade: (tradeData: Omit<TrackedTrade, "id" | "entryTime" | "status" | "history">) => Promise<void>;
+  trackTrade: (
+    tradeData: Omit<TrackedTrade, "id" | "entryTime" | "status" | "history">,
+  ) => Promise<void>;
   cancelTrade: (id: string) => Promise<void>;
   removeTrade: (id: string) => Promise<void>;
   refreshValidation: () => Promise<void>;
@@ -50,7 +52,7 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
       try {
         const jwt = await getJWTToken();
         const rows = await getDbTrades({ data: { token: jwt || "" } });
-        setTrades(rows as any);
+        setTrades(rows as unknown as TrackedTrade[]);
       } catch (e) {
         console.error("[tracker] Failed to fetch trades from db:", e);
         toast.error("Failed to load positions from database.");
@@ -86,18 +88,20 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
   };
 
   const trackTrade = async (
-    tradeData: Omit<TrackedTrade, "id" | "entryTime" | "status" | "history">
+    tradeData: Omit<TrackedTrade, "id" | "entryTime" | "status" | "history">,
   ) => {
     // Check duplication
     const exists = trades.some(
       (t) =>
         t.symbol === tradeData.symbol &&
         t.timeframe === tradeData.timeframe &&
-        (t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT")
+        (t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT"),
     );
 
     if (exists) {
-      toast.error(`Already tracking an active trade for ${tradeData.symbol} on ${tradeData.timeframe}`);
+      toast.error(
+        `Already tracking an active trade for ${tradeData.symbol} on ${tradeData.timeframe}`,
+      );
       return;
     }
 
@@ -123,7 +127,9 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
         if (!jwt) throw new Error("Could not retrieve authentication token.");
         await trackDbTrade({ data: { trade: newTrade, token: jwt } });
         setTrades([newTrade, ...trades]);
-        toast.success(`Position tracked in database: ${tradeData.symbol}/USDT at $${tradeData.entry.toLocaleString()}`);
+        toast.success(
+          `Position tracked in database: ${tradeData.symbol}/USDT at $${tradeData.entry.toLocaleString()}`,
+        );
       } catch (e) {
         console.error("[tracker] Failed to save position to db:", e);
         toast.error("Failed to track position in database.");
@@ -133,7 +139,9 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
     } else {
       const list = [newTrade, ...trades];
       saveLocalTrades(list);
-      toast.success(`Position tracked locally: ${tradeData.symbol}/USDT at $${tradeData.entry.toLocaleString()}`);
+      toast.success(
+        `Position tracked locally: ${tradeData.symbol}/USDT at $${tradeData.entry.toLocaleString()}`,
+      );
     }
   };
 
@@ -164,7 +172,7 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
               };
             }
             return t;
-          })
+          }),
         );
         toast.success("Position cancelled.");
       } catch (e) {
@@ -222,7 +230,7 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
   const refreshValidation = async () => {
     if (trades.length === 0) return;
     const active = trades.filter(
-      (t) => t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT"
+      (t) => t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT",
     );
     if (active.length === 0) return;
 
@@ -242,7 +250,7 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
           }
         });
 
-        setTrades(updatedList as any);
+        setTrades(updatedList as unknown as TrackedTrade[]);
       } else {
         // LocalStorage fallback validation
         const updated = await triggerValidation({ data: active });
@@ -278,7 +286,9 @@ export function TradeTrackerProvider({ children }: { children: React.ReactNode }
     } else if (trade.status === "BE_HIT") {
       toast.warning(`🛡️ Break-Even Stop Hit: ${trade.symbol}/USDT closed.`);
     } else if (trade.status === "MISSED") {
-      toast.warning(`⚠️ Missed Entry: Stop Loss level touched before Entry filled for ${trade.symbol}/USDT.`);
+      toast.warning(
+        `⚠️ Missed Entry: Stop Loss level touched before Entry filled for ${trade.symbol}/USDT.`,
+      );
     }
   };
 

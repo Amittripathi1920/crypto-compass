@@ -18,14 +18,21 @@ export function EquityCurve({
     pad.left + (i / Math.max(1, values.length - 1)) * (w - pad.left - pad.right);
   const y = (v: number) => pad.top + ((max - v) / span) * (h - pad.top - pad.bottom);
 
-  const line = values.map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`).join(" ");
+  const line = values
+    .map((v, i) => `${i === 0 ? "M" : "L"}${x(i).toFixed(1)},${y(v).toFixed(1)}`)
+    .join(" ");
   const area = `${line} L${x(values.length - 1).toFixed(1)},${y(Math.max(min, 0)).toFixed(1)} L${x(0).toFixed(1)},${y(Math.max(min, 0)).toFixed(1)} Z`;
   const last = values[values.length - 1] ?? 0;
   const positive = last >= 0;
 
   return (
     <div className={cn("w-full", className)}>
-      <svg viewBox={`0 0 ${w} ${h}`} className="h-48 w-full" role="img" aria-label="Cumulative R curve">
+      <svg
+        viewBox={`0 0 ${w} ${h}`}
+        className="h-48 w-full"
+        role="img"
+        aria-label="Cumulative R curve"
+      >
         <defs>
           <linearGradient id="eqFill" x1="0" y1="0" x2="0" y2="1">
             <stop

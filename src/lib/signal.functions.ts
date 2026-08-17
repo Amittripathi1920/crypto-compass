@@ -1,5 +1,22 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
+import type { SignalRequest } from "./signal-types";
+
+const ConfigSchema = z
+  .object({
+    minimumConfluenceScore: z.number().min(10).max(95).optional(),
+    minimumDirectionalEdge: z.number().min(0).max(50).optional(),
+    minimumRR: z.number().min(0.5).max(10).optional(),
+    atrMultiplier: z.number().min(0.5).max(5).optional(),
+    pivotStrength: z.number().min(2).max(10).optional(),
+    volumeThreshold: z.number().min(0.8).max(3).optional(),
+    signalExpiration: z.number().min(1).max(100).optional(),
+    minimumLiquidityStrength: z.number().min(1).max(100).optional(),
+    minimumScore: z.number().optional(),
+    minimumSetupScore: z.number().optional(),
+    minimumEntryScore: z.number().optional(),
+  })
+  .optional();
 
 const InputSchema = z.object({
   symbol: z
@@ -11,14 +28,14 @@ const InputSchema = z.object({
   provider: z.enum(["lovable", "openai", "anthropic", "google", "groq"]),
   model: z.string().max(80).optional(),
   apiKey: z.string().max(300).optional(),
-  config: z.any().optional(),
+  config: ConfigSchema,
 });
 
 export const analyzeCoin = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }) => {
     const { generateSignal } = await import("./signal.server");
-    return generateSignal(data as any);
+    return generateSignal(data as SignalRequest);
   });
 
 export const getLivePrice = createServerFn({ method: "POST" })
@@ -50,7 +67,7 @@ export const getPatternAnalysis = createServerFn({ method: "POST" })
           .regex(/^[A-Z0-9]+$/),
         timeframe: z.enum(["5m", "15m", "1h", "4h", "8h", "1d", "1w"]),
       })
-      .parse(input)
+      .parse(input),
   )
   .handler(async ({ data }) => {
     const { generatePatternAnalysis } = await import("./signal.server");
@@ -61,41 +78,47 @@ export const getPatternAnalysis = createServerFn({ method: "POST" })
 const BacktestInputSchema = z.object({
   symbol: z.string().min(2).max(10),
   timeframe: z.enum(["5m", "15m", "1h", "4h", "8h", "1d", "1w"]),
-  config: z.any().optional(),
+  config: ConfigSchema,
 });
 
 export const runHistoricalBacktest = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) => BacktestInputSchema.parse(input))
   .handler(async ({ data }) => {
-    const { fetchCandles } = await import("./market.server");
+    const { fetchConsistentMarketData } = await import("./market.server");
     const { BacktestEngine } = await import("./engine/BacktestEngine");
     const { DEFAULT_CONFIG } = await import("./engine/config");
     const { db } = await import("./db");
     const { backtestRuns, backtestTrades } = await import("./db/schema");
-    
-    // Fetch candles in parallel
-    const [c1d, c4h, c1h, c15m, c5m] = await Promise.all([
-      fetchCandles(data.symbol, "1d"),
-      fetchCandles(data.symbol, "4h"),
-      fetchCandles(data.symbol, "1h"),
-      fetchCandles(data.symbol, "15m"),
-      fetchCandles(data.symbol, "5m"),
+
+    // Fetch multi-timeframe candles consistently from one exchange
+    const marketData = await fetchConsistentMarketData(data.symbol, [
+      "1d",
+      "4h",
+      "1h",
+      "15m",
+      "5m",
     ]);
+
+    const c1d = marketData.candles["1d"] || [];
+    const c4h = marketData.candles["4h"] || [];
+    const c1h = marketData.candles["1h"] || [];
+    const c15m = marketData.candles["15m"] || [];
+    const c5m = marketData.candles["5m"] || [];
 
     const config = {
       ...DEFAULT_CONFIG,
-      ...(data.config || {})
+      ...(data.config || {}),
     };
 
     const result = BacktestEngine.run(
       data.symbol,
       data.timeframe,
-      c1d.value,
-      c4h.value,
-      c1h.value,
-      c15m.value,
-      c5m.value,
-      config
+      c1d,
+      c4h,
+      c1h,
+      c15m,
+      c5m,
+      config,
     );
 
     // Persist backtest run to database
@@ -116,7 +139,6 @@ export const runHistoricalBacktest = createServerFn({ method: "POST" })
       });
 
       if (result.trades.length > 0) {
-        // Insert up to 50 trades to database to prevent giant payload queries
         const tradesToInsert = result.trades.slice(-50).map((t) => ({
           id: `${runId}_${t.entryTime}`,
           runId,
@@ -144,20 +166,15 @@ export const runHistoricalBacktest = createServerFn({ method: "POST" })
     return result;
   });
 
-export const getBacktestHistory = createServerFn({ method: "POST" })
-  .handler(async () => {
-    const { db } = await import("./db");
-    const { backtestRuns } = await import("./db/schema");
-    const { desc } = await import("drizzle-orm");
-    try {
-      const rows = await db
-        .select()
-        .from(backtestRuns)
-        .orderBy(desc(backtestRuns.runTime))
-        .limit(10);
-      return rows;
-    } catch (e) {
-      console.error("[backtest] Failed to fetch history from database:", e);
-      return [];
-    }
-  });
+export const getBacktestHistory = createServerFn({ method: "POST" }).handler(async () => {
+  const { db } = await import("./db");
+  const { backtestRuns } = await import("./db/schema");
+  const { desc } = await import("drizzle-orm");
+  try {
+    const rows = await db.select().from(backtestRuns).orderBy(desc(backtestRuns.runTime)).limit(10);
+    return rows;
+  } catch (e) {
+    console.error("[backtest] Failed to fetch history from database:", e);
+    return [];
+  }
+});

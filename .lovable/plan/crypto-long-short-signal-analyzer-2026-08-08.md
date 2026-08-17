@@ -34,7 +34,7 @@ A single-page tool where you pick a coin and a timeframe, hit Analyze, and get a
 
 1. Live market data (candles + current price) is pulled from a free public crypto market data API — no account or key needed.
 2. Indicators (RSI, MACD, EMA 20/50/200, ATR, swing levels, volume trend) are computed in code from the real candles, so numbers are deterministic and never hallucinated.
-3. Those computed values plus recent price action go to Lovable AI, which returns a structured verdict: direction, confidence, entry, stop loss, targets, and the reasoning bullets. Build in a way so that in future I can use Claude, groq, or gemini or open ai in future, or select ai from frontend and provide  api key from the tool and it uses that
+3. Those computed values plus recent price action go to Lovable AI, which returns a structured verdict: direction, confidence, entry, stop loss, targets, and the reasoning bullets. Build in a way so that in future I can use Claude, groq, or gemini or open ai in future, or select ai from frontend and provide api key from the tool and it uses that
 4. Stop loss and targets are ATR- and swing-anchored, and validated in code (stop on the correct side of entry, R:R sanity-checked) before display.
 
 ## Technical notes

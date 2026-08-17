@@ -5,10 +5,10 @@ const internalAuth = createInternalNeonAuth(
   "https://ep-calm-mountain-ayvot686.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth",
   {
     adapter: BetterAuthReactAdapter(),
-  }
+  },
 );
 
-export const authClient = (internalAuth.adapter as any) as ReactBetterAuthClient;
+export const authClient = internalAuth.adapter as unknown as ReactBetterAuthClient;
 export const getJWTToken = internalAuth.getJWTToken;
 
 export const signIn = authClient.signIn;

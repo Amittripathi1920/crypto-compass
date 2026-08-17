@@ -179,7 +179,13 @@ export function PatternChart({ candles, pattern, isFullscreen = false }: Pattern
                   strokeDasharray="2 4"
                   opacity={0.8}
                 />
-                <text x={PLOT_W + 6} y={y(l.v) - 3} fill={l.color} fontSize={8} fontFamily="monospace">
+                <text
+                  x={PLOT_W + 6}
+                  y={y(l.v) - 3}
+                  fill={l.color}
+                  fontSize={8}
+                  fontFamily="monospace"
+                >
                   {l.label}
                 </text>
               </g>

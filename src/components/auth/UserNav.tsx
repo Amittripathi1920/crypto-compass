@@ -14,7 +14,7 @@ import { LogOut, User } from "lucide-react";
 
 export function UserNav() {
   const { data: sessionData } = useSession();
-  
+
   if (!sessionData?.user) return null;
   const { user } = sessionData;
 
@@ -37,8 +37,8 @@ export function UserNav() {
           },
           onError: (ctx) => {
             toast.error(ctx.error.message || "Failed to log out.");
-          }
-        }
+          },
+        },
       });
     } catch (e) {
       console.error("[auth] Log out error:", e);
@@ -49,7 +49,10 @@ export function UserNav() {
   return (
     <DropdownMenu>
       <DropdownMenuTrigger asChild>
-        <Button variant="ghost" className="relative h-8 w-8 rounded-full border border-border/80 bg-background/50 hover:bg-accent">
+        <Button
+          variant="ghost"
+          className="relative h-8 w-8 rounded-full border border-border/80 bg-background/50 hover:bg-accent"
+        >
           <Avatar className="h-8 w-8">
             <AvatarFallback className="text-xs font-bold uppercase text-primary">
               {initials}
@@ -57,15 +60,17 @@ export function UserNav() {
           </Avatar>
         </Button>
       </DropdownMenuTrigger>
-      <DropdownMenuContent className="w-56 border border-border bg-card text-foreground" align="end" forceMount>
+      <DropdownMenuContent
+        className="w-56 border border-border bg-card text-foreground"
+        align="end"
+        forceMount
+      >
         <DropdownMenuLabel className="font-normal">
           <div className="flex flex-col space-y-1.5 p-1">
             <p className="text-sm font-bold leading-none text-foreground flex items-center gap-1.5">
               <User className="h-3.5 w-3.5 text-primary" /> {user.name}
             </p>
-            <p className="text-xs leading-none text-muted-foreground truncate">
-              {user.email}
-            </p>
+            <p className="text-xs leading-none text-muted-foreground truncate">{user.email}</p>
           </div>
         </DropdownMenuLabel>
         <DropdownMenuSeparator className="bg-border/60" />

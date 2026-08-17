@@ -1,4 +1,14 @@
-import { pgSchema, pgTable, text, timestamp, boolean, doublePrecision, bigint, jsonb, uuid } from "drizzle-orm/pg-core";
+import {
+  pgSchema,
+  pgTable,
+  text,
+  timestamp,
+  boolean,
+  doublePrecision,
+  bigint,
+  jsonb,
+  uuid,
+} from "drizzle-orm/pg-core";
 
 // Define the neon_auth schema managed by Neon Auth
 export const authSchema = pgSchema("neon_auth");
@@ -11,7 +21,7 @@ export const user = authSchema.table("user", {
   emailVerified: boolean("emailVerified").notNull(), // camelCase column
   image: text("image"),
   createdAt: timestamp("createdAt").defaultNow().notNull(), // camelCase column
-  updatedAt: timestamp("updatedAt").defaultNow().notNull() // camelCase column
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(), // camelCase column
 });
 
 export const session = authSchema.table("session", {
@@ -22,14 +32,18 @@ export const session = authSchema.table("session", {
   updatedAt: timestamp("updatedAt").notNull(), // camelCase column
   ipAddress: text("ipAddress"), // camelCase column
   userAgent: text("userAgent"), // camelCase column
-  userId: uuid("userId").notNull().references(() => user.id, { onDelete: "cascade" }) // camelCase column
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }), // camelCase column
 });
 
 export const account = authSchema.table("account", {
   id: uuid("id").primaryKey().defaultRandom().notNull(),
   accountId: text("accountId").notNull(),
   providerId: text("providerId").notNull(),
-  userId: uuid("userId").notNull().references(() => user.id, { onDelete: "cascade" }),
+  userId: uuid("userId")
+    .notNull()
+    .references(() => user.id, { onDelete: "cascade" }),
   accessToken: text("accessToken"),
   refreshToken: text("refreshToken"),
   idToken: text("idToken"),
@@ -38,7 +52,7 @@ export const account = authSchema.table("account", {
   scope: text("scope"),
   password: text("password"),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").notNull()
+  updatedAt: timestamp("updatedAt").notNull(),
 });
 
 export const verification = authSchema.table("verification", {
@@ -47,7 +61,7 @@ export const verification = authSchema.table("verification", {
   value: text("value").notNull(),
   expiresAt: timestamp("expiresAt").notNull(),
   createdAt: timestamp("createdAt").defaultNow().notNull(),
-  updatedAt: timestamp("updatedAt").defaultNow().notNull()
+  updatedAt: timestamp("updatedAt").defaultNow().notNull(),
 });
 
 // Custom application tables inside public schema
@@ -68,7 +82,7 @@ export const trackedTrades = pgTable("tracked_trades", {
   closeTime: bigint("close_time", { mode: "number" }),
   status: text("status").notNull(),
   currentPrice: doublePrecision("current_price"),
-  history: jsonb("history").notNull()
+  history: jsonb("history").notNull(),
 });
 
 // Custom tables for Confluence engine & Backtesting framework
@@ -81,7 +95,7 @@ export const marketCandles = pgTable("market_candles", {
   high: doublePrecision("high").notNull(),
   low: doublePrecision("low").notNull(),
   close: doublePrecision("close").notNull(),
-  volume: doublePrecision("volume").notNull()
+  volume: doublePrecision("volume").notNull(),
 });
 
 export const marketStructures = pgTable("market_structures", {
@@ -91,7 +105,7 @@ export const marketStructures = pgTable("market_structures", {
   type: text("type").notNull(), // SWING_HIGH, SWING_LOW, BOS_BULL, BOS_BEAR, CHOCH_BULL, CHOCH_BEAR
   price: doublePrecision("price").notNull(),
   time: bigint("time", { mode: "number" }).notNull(),
-  strength: doublePrecision("strength").default(1.0)
+  strength: doublePrecision("strength").default(1.0),
 });
 
 export const liquidityLevels = pgTable("liquidity_levels", {
@@ -102,7 +116,7 @@ export const liquidityLevels = pgTable("liquidity_levels", {
   price: doublePrecision("price").notNull(),
   strength: doublePrecision("strength").notNull(),
   isSwept: boolean("is_swept").default(false).notNull(),
-  time: bigint("time", { mode: "number" }).notNull()
+  time: bigint("time", { mode: "number" }).notNull(),
 });
 
 export const zones = pgTable("zones", {
@@ -115,7 +129,7 @@ export const zones = pgTable("zones", {
   time: bigint("time", { mode: "number" }).notNull(),
   isFresh: boolean("is_fresh").default(true).notNull(),
   testCount: doublePrecision("test_count").default(0).notNull(),
-  volumeConfirm: doublePrecision("volume_confirm").default(1.0)
+  volumeConfirm: doublePrecision("volume_confirm").default(1.0),
 });
 
 export const setups = pgTable("setups", {
@@ -128,7 +142,7 @@ export const setups = pgTable("setups", {
   entryScore: doublePrecision("entry_score").notNull(),
   finalScore: doublePrecision("final_score").notNull(),
   reasons: jsonb("reasons").notNull(), // string[]
-  time: bigint("time", { mode: "number" }).notNull()
+  time: bigint("time", { mode: "number" }).notNull(),
 });
 
 export const signals = pgTable("signals", {
@@ -145,7 +159,7 @@ export const signals = pgTable("signals", {
   riskReward: doublePrecision("risk_reward").notNull(),
   marketRegime: text("market_regime").notNull(),
   invalidation: text("invalidation").notNull(),
-  time: bigint("time", { mode: "number" }).notNull()
+  time: bigint("time", { mode: "number" }).notNull(),
 });
 
 export const signalEvents = pgTable("signal_events", {
@@ -156,7 +170,7 @@ export const signalEvents = pgTable("signal_events", {
   toStatus: text("to_status").notNull(),
   price: doublePrecision("price").notNull(),
   detail: text("detail").notNull(),
-  time: bigint("time", { mode: "number" }).notNull()
+  time: bigint("time", { mode: "number" }).notNull(),
 });
 
 export const signalResults = pgTable("signal_results", {
@@ -168,7 +182,7 @@ export const signalResults = pgTable("signal_results", {
   holdingTimeMs: bigint("holding_time_ms", { mode: "number" }),
   mae: doublePrecision("mae"),
   mfe: doublePrecision("mfe"),
-  time: bigint("time", { mode: "number" }).notNull()
+  time: bigint("time", { mode: "number" }).notNull(),
 });
 
 export const backtestRuns = pgTable("backtest_runs", {
@@ -183,7 +197,7 @@ export const backtestRuns = pgTable("backtest_runs", {
   maxDrawdown: doublePrecision("max_drawdown").notNull(),
   expectancy: doublePrecision("expectancy").notNull(),
   sharpeRatio: doublePrecision("sharpe_ratio").notNull(),
-  runTime: timestamp("run_time").defaultNow().notNull()
+  runTime: timestamp("run_time").defaultNow().notNull(),
 });
 
 export const backtestTrades = pgTable("backtest_trades", {
@@ -202,12 +216,12 @@ export const backtestTrades = pgTable("backtest_trades", {
   rMultiple: doublePrecision("r_multiple").notNull(),
   result: text("result").notNull(), // WIN, LOSS, BE
   marketRegime: text("market_regime").notNull(),
-  setupType: text("setup_type").notNull()
+  setupType: text("setup_type").notNull(),
 });
 
 export const strategyMetrics = pgTable("strategy_metrics", {
   id: text("id").primaryKey().notNull(),
   backtestId: text("backtest_id").references(() => backtestRuns.id, { onDelete: "cascade" }),
   metricName: text("metric_name").notNull(), // e.g. "WIN_RATE_BULLISH_TREND", "PF_15M"
-  metricValue: doublePrecision("metric_value").notNull()
+  metricValue: doublePrecision("metric_value").notNull(),
 });

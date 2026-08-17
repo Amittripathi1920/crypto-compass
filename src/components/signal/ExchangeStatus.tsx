@@ -65,7 +65,9 @@ export function ExchangeStatus({
                 <Icon className="h-3.5 w-3.5" />
                 <p className="text-xs font-semibold">{e.name}</p>
                 {e.state !== "idle" ? (
-                  <span className="tabular ml-auto text-[10px] text-muted-foreground">{e.ms}ms</span>
+                  <span className="tabular ml-auto text-[10px] text-muted-foreground">
+                    {e.ms}ms
+                  </span>
                 ) : null}
               </div>
               <p className="mt-1 line-clamp-2 text-[10px] leading-snug text-muted-foreground">

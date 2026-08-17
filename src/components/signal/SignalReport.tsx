@@ -1,5 +1,19 @@
 import { useState, useMemo } from "react";
-import { ArrowDownRight, ArrowUpRight, MinusCircle, Target, ShieldAlert, Crosshair, Share2, Calculator, CheckCircle2, XCircle } from "lucide-react";
+import {
+  ArrowDownRight,
+  ArrowUpRight,
+  MinusCircle,
+  Target,
+  ShieldAlert,
+  Crosshair,
+  Share2,
+  Calculator,
+  CheckCircle2,
+  XCircle,
+  TrendingUp,
+  Activity,
+  Layers,
+} from "lucide-react";
 import { useTradeTracker } from "@/hooks/useTradeTracker";
 import type { SignalResult } from "@/lib/signal-types";
 import { PriceChart } from "./PriceChart";
@@ -46,9 +60,8 @@ function TradeCalculator({
   isTracked: boolean;
   onTrack: () => void;
 }) {
+  const priceRiskPct = (Math.abs(entry - stopLoss) / (entry || 1)) * 100;
 
-  const priceRiskPct = (Math.abs(entry - stopLoss) / entry) * 100;
-  
   // Standardized Sizing: Controlled by Account Risk % + Stop distance
   const dollarRisk = balance * (riskPct / 100);
   const positionSize = priceRiskPct > 0 ? dollarRisk / (priceRiskPct / 100) : 0;
@@ -56,15 +69,14 @@ function TradeCalculator({
   const contractUnits = entry > 0 ? positionSize / entry : 0;
 
   // Estimated profit amounts
-  const t1ProfitPct = (Math.abs(target1 - entry) / entry) * 100;
-  const t2ProfitPct = (Math.abs(target2 - entry) / entry) * 100;
-  const t3ProfitPct = target3 ? (Math.abs(target3 - entry) / entry) * 100 : 0;
+  const t1ProfitPct = (Math.abs(target1 - entry) / (entry || 1)) * 100;
+  const t2ProfitPct = (Math.abs(target2 - entry) / (entry || 1)) * 100;
+  const t3ProfitPct = target3 ? (Math.abs(target3 - entry) / (entry || 1)) * 100 : 0;
 
   const estProfitT1 = positionSize * (t1ProfitPct / 100);
   const estProfitT2 = positionSize * (t2ProfitPct / 100);
   const estProfitT3 = target3 ? positionSize * (t3ProfitPct / 100) : 0;
 
-  // High leverage warnings
   const isLeverageDangerous = requiredLeverage > 20;
 
   return (
@@ -115,7 +127,7 @@ function TradeCalculator({
                     "rounded border px-1.5 py-0.5 text-[9px] font-bold transition-colors text-center",
                     riskPct === r
                       ? "border-primary bg-primary/10 text-primary"
-                      : "border-border text-muted-foreground hover:bg-muted/30 hover:text-foreground"
+                      : "border-border text-muted-foreground hover:bg-muted/30 hover:text-foreground",
                   )}
                 >
                   {r}%
@@ -130,7 +142,8 @@ function TradeCalculator({
         <div className="rounded border border-red-500/40 bg-red-500/5 px-3 py-2 flex items-center gap-2 text-red-400 text-xs">
           <ShieldAlert className="h-4 w-4 shrink-0 text-red-500 animate-pulse" />
           <span className="font-semibold">
-            Warning: Required leverage ({requiredLeverage.toFixed(1)}x) exceeds safe maximum risk bounds (20x). Reduce position risk % or widen entry zone.
+            Warning: Required leverage ({requiredLeverage.toFixed(1)}x) exceeds safe bounds (20x).
+            Reduce position risk % or widen entry zone.
           </span>
         </div>
       )}
@@ -152,7 +165,12 @@ function TradeCalculator({
           <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
             Required Leverage
           </span>
-          <span className={cn("tabular text-sm font-bold block mt-0.5", isLeverageDangerous ? "text-red-400" : "text-foreground")}>
+          <span
+            className={cn(
+              "tabular text-sm font-bold block mt-0.5",
+              isLeverageDangerous ? "text-red-400" : "text-foreground",
+            )}
+          >
             {requiredLeverage.toFixed(1)}x
           </span>
           <span className="text-[9px] text-muted-foreground block mt-0.5">
@@ -165,7 +183,11 @@ function TradeCalculator({
             Profit Target 1
           </span>
           <span className="tabular text-sm font-bold text-bull block mt-0.5">
-            +${estProfitT1.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+            +$
+            {estProfitT1.toLocaleString(undefined, {
+              minimumFractionDigits: 2,
+              maximumFractionDigits: 2,
+            })}
           </span>
           <span className="tabular text-[9px] text-muted-foreground block mt-0.5">
             {t1ProfitPct.toFixed(1)}% move
@@ -177,7 +199,10 @@ function TradeCalculator({
             Profit Target 2 / 3
           </span>
           <span className="tabular text-sm font-bold text-bull block mt-0.5">
-            +${estProfitT2.toLocaleString(undefined, { maximumFractionDigits: 0 })} / {target3 ? `+$${estProfitT3.toLocaleString(undefined, { maximumFractionDigits: 0 })}` : "N/A"}
+            +${estProfitT2.toLocaleString(undefined, { maximumFractionDigits: 0 })} /{" "}
+            {target3
+              ? `+$${estProfitT3.toLocaleString(undefined, { maximumFractionDigits: 0 })}`
+              : "N/A"}
           </span>
           <span className="tabular text-[9px] text-muted-foreground block mt-0.5">
             Target 2: {t2ProfitPct.toFixed(1)}% move
@@ -194,7 +219,7 @@ function TradeCalculator({
             "h-8 px-4 text-xs font-bold uppercase tracking-wider border",
             isTracked
               ? "border-primary/50 bg-primary/10 text-primary hover:bg-primary/20"
-              : "border-border bg-background/50 text-muted-foreground hover:text-foreground"
+              : "border-border bg-background/50 text-muted-foreground hover:text-foreground",
           )}
         >
           {isTracked ? "✓ Tracking Signal" : "Track Trade Setup"}
@@ -208,14 +233,14 @@ export function SignalReport({ result }: { result: SignalResult }) {
   const isLong = result.direction === "LONG";
   const isShort = result.direction === "SHORT";
   const isNoTrade = result.direction === "NO TRADE";
-  
+
   const dirColor = isLong ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground";
   const DirIcon = isLong ? ArrowUpRight : isShort ? ArrowDownRight : MinusCircle;
 
   const [calcBalance, setCalcBalance] = useState(1000);
   const [calcRiskPct, setCalcRiskPct] = useState(1.0);
 
-  const priceRiskPct = (Math.abs(result.entry - result.stopLoss) / result.entry) * 100;
+  const priceRiskPct = (Math.abs(result.entry - result.stopLoss) / (result.entry || 1)) * 100;
   const dollarRisk = calcBalance * (calcRiskPct / 100);
   const positionSize = priceRiskPct > 0 ? dollarRisk / (priceRiskPct / 100) : 0;
   const calcLeverage = calcBalance > 0 ? positionSize / calcBalance : 1;
@@ -224,20 +249,34 @@ export function SignalReport({ result }: { result: SignalResult }) {
 
   const isTracked = useMemo(() => {
     return trades.some(
-      (t: any) =>
+      (t) =>
         t.symbol === result.symbol &&
         t.timeframe === result.timeframe &&
-        (t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT")
+        (t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT"),
     );
   }, [trades, result]);
+
+  const levels = useMemo(() => {
+    if (isNoTrade) return [];
+    const list = [
+      { label: "ENTRY", value: result.entry, color: "var(--primary)" },
+      { label: "STOP", value: result.stopLoss, color: "var(--bear)" },
+      { label: "TP1", value: result.target1, color: "var(--bull)" },
+      { label: "TP2", value: result.target2, color: "var(--bull)" },
+    ];
+    if (result.target3) {
+      list.push({ label: "TP3", value: result.target3, color: "var(--bull)" });
+    }
+    return list;
+  }, [result, isNoTrade]);
 
   const handleTrack = () => {
     if (isTracked) {
       const activeT = trades.find(
-        (t: any) =>
+        (t) =>
           t.symbol === result.symbol &&
           t.timeframe === result.timeframe &&
-          (t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT")
+          (t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT"),
       );
       if (activeT) {
         removeTrade(activeT.id);
@@ -266,7 +305,7 @@ export function SignalReport({ result }: { result: SignalResult }) {
       const img = new Image();
       const svgBlob = new Blob([svgStr], { type: "image/svg+xml;charset=utf-8" });
       const url = URL.createObjectURL(svgBlob);
-      
+
       return new Promise((resolve) => {
         img.onload = () => {
           URL.revokeObjectURL(url);
@@ -278,7 +317,7 @@ export function SignalReport({ result }: { result: SignalResult }) {
             resolve(null);
             return;
           }
-          ctx.fillStyle = "#0c0a09"; // Stone-950 dark background color
+          ctx.fillStyle = "#0c0a09";
           ctx.fillRect(0, 0, 1520, 780);
           ctx.drawImage(img, 0, 0, 1520, 780);
           canvas.toBlob((blob) => resolve(blob), "image/png");
@@ -286,21 +325,27 @@ export function SignalReport({ result }: { result: SignalResult }) {
         img.onerror = () => resolve(null);
         img.src = url;
       });
-    } catch (e) {
+    } catch {
       return null;
     }
   };
 
   const handleShare = async () => {
     const emoji = isLong ? "📈" : isShort ? "📉" : "⚪";
-    const percentage = result.change24hPct >= 0 ? `+${result.change24hPct.toFixed(2)}%` : `${result.change24hPct.toFixed(2)}%`;
-    const riskPct = ((Math.abs(result.entry - result.stopLoss) / result.entry) * 100).toFixed(2);
-    const target1Pct = ((Math.abs(result.target1 - result.entry) / result.entry) * 100).toFixed(2);
-    const sentimentStr = result.sentiment ? `${result.sentiment.value} (${result.sentiment.label})` : "N/A";
+    const percentage =
+      result.change24hPct >= 0
+        ? `+${result.change24hPct.toFixed(2)}%`
+        : `${result.change24hPct.toFixed(2)}%`;
+    const riskPct = (
+      (Math.abs(result.entry - result.stopLoss) / (result.entry || 1)) *
+      100
+    ).toFixed(2);
+    const target1Pct = (
+      (Math.abs(result.target1 - result.entry) / (result.entry || 1)) *
+      100
+    ).toFixed(2);
 
-    const reasoningText = result.reasoning
-      .map((r) => `• [${r.label}] ${r.detail}`)
-      .join("\n");
+    const reasoningText = result.reasoning.map((r) => `• [${r.label}] ${r.detail}`).join("\n");
 
     const text = isNoTrade
       ? `⚪ CRYPTO COMPASS SIGNAL: ${result.symbol}/USDT (${result.timeframe.toUpperCase()})
@@ -310,7 +355,7 @@ Market Regime: ${result.marketRegime}
 Summary: ${result.summary}
 Generated via Crypto Compass Lab.`
       : `${emoji} CRYPTO COMPASS SIGNAL: ${result.symbol}/USDT (${result.timeframe.toUpperCase()})
-Direction: ${result.direction} (Confluence: ${result.finalScore || result.confidence}%)
+Direction: ${result.direction} (Confluence: ${result.confluenceScore}/100 · Confidence: ${result.confidence})
 Current Price: $${fmtPrice(result.currentPrice)} (${percentage} 24h)
 Market Regime: ${result.marketRegime}
 🎯 Entry Zone: $${fmtPrice(result.entry)}
@@ -318,7 +363,7 @@ Market Regime: ${result.marketRegime}
 🥇 Target 1: $${fmtPrice(result.target1)} (Reward: ${target1Pct}%)
 🥈 Target 2: $${fmtPrice(result.target2)}
 ${result.target3 ? `🥉 Target 3: $${fmtPrice(result.target3)}\n` : ""}⚖️ Risk/Reward: ${result.riskReward.toFixed(2)}R
-💡 Why This Trend:
+💡 Evidence Breakdown:
 ${reasoningText}
 Summary: ${result.summary}
 Invalidation: ${result.invalidation}
@@ -327,15 +372,7 @@ Generated via Crypto Compass Lab.`;
     const hasShare = typeof navigator !== "undefined" && !!navigator.share;
     const hasClipboard = typeof navigator !== "undefined" && !!navigator.clipboard;
 
-    const fallbackCopyManual = () => {
-      try {
-        window.prompt("Copy the trade setup manually:", text);
-      } catch (e) {
-        toast.error("Sharing blocked by browser security.");
-      }
-    };
-
-    toast.loading("Generating shareable chart image...", { id: "share-loader" });
+    toast.loading("Preparing shareable card...", { id: "share-loader" });
     const pngBlob = await getChartImageBlob().catch(() => null);
     toast.dismiss("share-loader");
 
@@ -369,39 +406,14 @@ Generated via Crypto Compass Lab.`;
           toast.success("Copied signal text AND chart image to clipboard!");
           return;
         } catch (err) {
-          console.error("[share] ClipboardItem write failed:", err);
+          console.error("[share] Clipboard write failed:", err);
         }
       }
     }
 
-    if (hasShare) {
-      try {
-        await navigator.share({
-          title: `${result.symbol}/USDT Setup`,
-          text: text,
-        });
-        toast.success("Signal shared successfully!");
-      } catch (err) {
-        if (err instanceof Error && err.name !== "AbortError") {
-          if (hasClipboard) {
-            navigator.clipboard.writeText(text);
-            toast.success("Copied trade setup card to clipboard!");
-          } else {
-            fallbackCopyManual();
-          }
-        }
-      }
-    } else {
-      if (hasClipboard) {
-        try {
-          await navigator.clipboard.writeText(text);
-          toast.success("Copied trade setup card to clipboard!");
-        } catch (e) {
-          fallbackCopyManual();
-        }
-      } else {
-        fallbackCopyManual();
-      }
+    if (hasClipboard) {
+      await navigator.clipboard.writeText(text);
+      toast.success("Copied trade setup card to clipboard!");
     }
   };
 
@@ -427,22 +439,40 @@ Generated via Crypto Compass Lab.`;
               <h2 className="text-4xl font-bold">{result.direction}</h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
-              Score Confluence: {result.finalScore || result.confidence}% · R:R {result.riskReward.toFixed(2)} ·{" "}
-              {result.modelUsed}
+              Confluence:{" "}
+              <span className="font-semibold text-foreground">{result.confluenceScore}/100</span> ·
+              Confidence: <span className="font-semibold text-foreground">{result.confidence}</span>{" "}
+              · R:R {result.riskReward.toFixed(2)} · {result.modelUsed}
             </p>
-            <div className="mt-3 flex flex-wrap gap-2">
+            <div className="mt-3 flex flex-wrap gap-2 items-center">
               <span
                 className={cn(
                   "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                  result.marketRegime.includes("Bullish") || result.marketRegime.includes("STRONG_BULLISH")
+                  result.marketRegime.includes("BULLISH")
                     ? "border-bull/30 bg-bull/10 text-bull"
-                    : result.marketRegime.includes("Bearish") || result.marketRegime.includes("STRONG_BEARISH")
+                    : result.marketRegime.includes("BEARISH")
                       ? "border-bear/30 bg-bear/10 text-bear"
                       : "border-border bg-muted/20 text-muted-foreground",
                 )}
               >
                 Regime: {result.marketRegime}
               </span>
+
+              {/* Directional Edge Badge */}
+              <span
+                className={cn(
+                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold tracking-wider",
+                  isLong
+                    ? "border-bull/30 bg-bull/10 text-bull"
+                    : isShort
+                      ? "border-bear/30 bg-bear/10 text-bear"
+                      : "border-border bg-muted/20 text-muted-foreground",
+                )}
+              >
+                Edge: {result.directionalEdge > 0 ? `+${result.directionalEdge} pts` : "0 pts"} (L:{" "}
+                {result.longScore} | S: {result.shortScore})
+              </span>
+
               {result.sentiment ? (
                 <span
                   className={cn(
@@ -490,39 +520,58 @@ Generated via Crypto Compass Lab.`;
           </div>
         </div>
 
-        {/* Triple Confluence Gauges Grid */}
+        {/* Confluence Metrics Grid */}
         <div className="mt-5 grid grid-cols-3 gap-3">
           <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center">
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-              Setup Quality
+              Long Score
             </span>
-            <span className="text-base font-bold block text-foreground mt-0.5">
-              {result.setupScore || 0}/100
+            <span className="text-base font-bold block text-bull mt-0.5">
+              {result.longScore}/100
             </span>
             <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-primary/80 rounded-full" style={{ width: `${result.setupScore || 0}%` }} />
+              <div
+                className="h-full bg-bull rounded-full"
+                style={{ width: `${result.longScore}%` }}
+              />
             </div>
           </div>
+
           <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center">
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-              Entry Trigger
+              Short Score
             </span>
-            <span className="text-base font-bold block text-foreground mt-0.5">
-              {result.entryScore || 0}/100
+            <span className="text-base font-bold block text-bear mt-0.5">
+              {result.shortScore}/100
             </span>
             <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div className="h-full bg-primary/80 rounded-full" style={{ width: `${result.entryScore || 0}%` }} />
+              <div
+                className="h-full bg-bear rounded-full"
+                style={{ width: `${result.shortScore}%` }}
+              />
             </div>
           </div>
+
           <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center">
             <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-              Combined Score
+              Confluence
             </span>
-            <span className={cn("text-base font-bold block mt-0.5", isLong ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground")}>
-              {result.finalScore || result.confidence || 0}%
+            <span
+              className={cn(
+                "text-base font-bold block mt-0.5",
+                isLong ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground",
+              )}
+            >
+              {result.confluenceScore}/100 ({result.confidence})
             </span>
             <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div className={cn("h-full rounded-full", isLong ? "bg-bull" : isShort ? "bg-bear" : "bg-neutral")} style={{ width: `${result.finalScore || result.confidence || 0}%` }} />
+              <div
+                className={cn(
+                  "h-full rounded-full",
+                  isLong ? "bg-bull" : isShort ? "bg-bear" : "bg-muted-foreground",
+                )}
+                style={{ width: `${result.confluenceScore}%` }}
+              />
             </div>
           </div>
         </div>
@@ -535,7 +584,8 @@ Generated via Crypto Compass Lab.`;
           <ShieldAlert className="h-7 w-7 text-muted-foreground/85" />
           <h4 className="text-sm font-semibold text-foreground">No Trade Setup Triggered</h4>
           <p className="text-xs text-muted-foreground max-w-sm">
-            Current market structure does not offer a high-probability confluence sweet spot. Capital preservation is prioritized over low-probability entries.
+            Current market structure does not satisfy high-confluence criteria. Directional edge is
+            below threshold or hard quality filters prevented execution.
           </p>
           {result.rejectionReasons && result.rejectionReasons.length > 0 && (
             <div className="mt-3.5 text-left border border-border/30 rounded bg-background/50 p-3 max-w-md w-full space-y-1.5">
@@ -552,7 +602,7 @@ Generated via Crypto Compass Lab.`;
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Multi-Timeframe Checklist & Confirmations */}
+          {/* Multi-Timeframe Confirmation Checklist */}
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
             <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between">
               <div>
@@ -560,10 +610,10 @@ Generated via Crypto Compass Lab.`;
                   Volume Expansion
                 </span>
                 <span className="text-xs text-foreground font-semibold">
-                  Relative Vol (RVOL)
+                  RVOL ({result.indicators.volumeRatio}x)
                 </span>
               </div>
-              {result.indicators.volumeRatio >= 1.25 ? (
+              {result.indicators.volumeRatio >= 1.2 ? (
                 <CheckCircle2 className="h-5 w-5 text-bull" />
               ) : (
                 <XCircle className="h-5 w-5 text-muted-foreground/45" />
@@ -576,10 +626,10 @@ Generated via Crypto Compass Lab.`;
                   Momentum Alignment
                 </span>
                 <span className="text-xs text-foreground font-semibold">
-                  RSI & MACD stack
+                  RSI ({result.indicators.rsi}) & MACD
                 </span>
               </div>
-              {result.indicators.rsi >= 40 && result.indicators.rsi <= 70 ? (
+              {result.indicators.rsi >= 40 && result.indicators.rsi <= 68 ? (
                 <CheckCircle2 className="h-5 w-5 text-bull" />
               ) : (
                 <XCircle className="h-5 w-5 text-muted-foreground/45" />
@@ -591,9 +641,7 @@ Generated via Crypto Compass Lab.`;
                 <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
                   Structure Confirmation
                 </span>
-                <span className="text-xs text-foreground font-semibold">
-                  BOS / CHoCH present
-                </span>
+                <span className="text-xs text-foreground font-semibold">BOS / CHoCH Break</span>
               </div>
               {result.reasoning.some((r) => r.label.includes("Structure")) ? (
                 <CheckCircle2 className="h-5 w-5 text-bull" />
@@ -603,66 +651,68 @@ Generated via Crypto Compass Lab.`;
             </div>
           </div>
 
-          {/* S/R levels */}
-          <section className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-            <div className="rounded-lg border border-primary/45 bg-primary/5 p-3">
-              <div className="flex items-center gap-1.5 text-primary">
-                <Crosshair className="h-3.5 w-3.5" />
-                <p className="text-[10px] uppercase tracking-widest font-semibold">Entry</p>
+          {/* Trade Levels Cards */}
+          <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+            <div className="rounded-xl border border-border bg-card/60 p-4">
+              <div className="flex items-center gap-2 text-muted-foreground">
+                <Crosshair className="h-4 w-4" />
+                <span className="text-[10px] uppercase tracking-widest">Entry</span>
               </div>
-              <p className="tabular mt-1 text-base font-bold text-foreground">
+              <p className="tabular mt-2 text-xl font-bold text-foreground">
                 ${fmtPrice(result.entry)}
               </p>
+              <p className="mt-1 text-[10px] text-muted-foreground">
+                {result.setupType?.join(" · ") || "Market Structure Entry"}
+              </p>
             </div>
-            <div className="rounded-lg border border-bear/45 bg-bear/5 p-3">
-              <div className="flex items-center gap-1.5 text-bear">
-                <ShieldAlert className="h-3.5 w-3.5" />
-                <p className="text-[10px] uppercase tracking-widest font-semibold">Stop loss</p>
+
+            <div className="rounded-xl border border-bear/40 bg-bear/5 p-4">
+              <div className="flex items-center gap-2 text-bear">
+                <ShieldAlert className="h-4 w-4" />
+                <span className="text-[10px] uppercase tracking-widest font-semibold">
+                  Stop Loss
+                </span>
               </div>
-              <p className="tabular mt-1 text-base font-bold text-foreground">
+              <p className="tabular mt-2 text-xl font-bold text-bear">
                 ${fmtPrice(result.stopLoss)}
               </p>
-              <p className="tabular mt-0.5 text-[9px] text-muted-foreground">
-                risk {fmtPct((Math.abs(result.entry - result.stopLoss) / result.entry) * 100)}
+              <p className="tabular mt-1 text-[10px] text-muted-foreground">
+                Risk: {priceRiskPct.toFixed(2)}%
               </p>
             </div>
-            <div className="rounded-lg border border-bull/45 bg-bull/5 p-3">
-              <div className="flex items-center gap-1.5 text-bull">
-                <Target className="h-3.5 w-3.5" />
-                <p className="text-[10px] uppercase tracking-widest font-semibold">Target 1</p>
+
+            <div className="rounded-xl border border-bull/40 bg-bull/5 p-4">
+              <div className="flex items-center gap-2 text-bull">
+                <Target className="h-4 w-4" />
+                <span className="text-[10px] uppercase tracking-widest font-semibold">
+                  Target 1
+                </span>
               </div>
-              <p className="tabular mt-1 text-base font-bold text-foreground">
+              <p className="tabular mt-2 text-xl font-bold text-bull">
                 ${fmtPrice(result.target1)}
               </p>
-              <p className="tabular mt-0.5 text-[9px] text-muted-foreground">
-                reward {fmtPct((Math.abs(result.target1 - result.entry) / result.entry) * 100)}
+              <p className="tabular mt-1 text-[10px] text-muted-foreground">
+                Reward: +
+                {((Math.abs(result.target1 - result.entry) / (result.entry || 1)) * 100).toFixed(2)}
+                %
               </p>
             </div>
-            <div className="rounded-lg border border-bull/30 bg-bull/5 p-3">
-              <div className="flex items-center gap-1.5 text-bull/85">
-                <Target className="h-3.5 w-3.5" />
-                <p className="text-[10px] uppercase tracking-widest font-semibold">Target 2</p>
+
+            <div className="rounded-xl border border-bull/40 bg-bull/5 p-4">
+              <div className="flex items-center gap-2 text-bull">
+                <Target className="h-4 w-4" />
+                <span className="text-[10px] uppercase tracking-widest font-semibold">
+                  Target 2 / 3
+                </span>
               </div>
-              <p className="tabular mt-1 text-base font-bold text-foreground">
-                ${fmtPrice(result.target2)}
+              <p className="tabular mt-2 text-xl font-bold text-bull">
+                ${fmtPrice(result.target2)} {result.target3 ? `· $${fmtPrice(result.target3)}` : ""}
               </p>
-              <p className="tabular mt-0.5 text-[9px] text-muted-foreground">
-                {result.riskReward.toFixed(1)}x R:R
-              </p>
-            </div>
-            <div className="rounded-lg border border-bull/20 bg-bull/5 p-3 col-span-2 lg:col-span-1">
-              <div className="flex items-center gap-1.5 text-bull/70">
-                <Target className="h-3.5 w-3.5" />
-                <p className="text-[10px] uppercase tracking-widest font-semibold">Target 3</p>
-              </div>
-              <p className="tabular mt-1 text-base font-bold text-foreground">
-                {result.target3 ? `$${fmtPrice(result.target3)}` : "N/A"}
-              </p>
-              <p className="tabular mt-0.5 text-[9px] text-muted-foreground">
-                Macro resistance
+              <p className="tabular mt-1 text-[10px] text-muted-foreground">
+                R:R: {result.riskReward.toFixed(2)}R
               </p>
             </div>
-          </section>
+          </div>
 
           <TradeCalculator
             entry={result.entry}
@@ -670,7 +720,7 @@ Generated via Crypto Compass Lab.`;
             target1={result.target1}
             target2={result.target2}
             target3={result.target3}
-            direction={isLong ? "LONG" : "SHORT"}
+            direction={result.direction as "LONG" | "SHORT"}
             balance={calcBalance}
             setBalance={setCalcBalance}
             riskPct={calcRiskPct}
@@ -681,96 +731,78 @@ Generated via Crypto Compass Lab.`;
         </div>
       )}
 
-      <PriceChart
-        candles={result.candles}
-        levels={
-          isNoTrade
-            ? []
-            : [
-                { label: "E", value: result.entry, color: "var(--primary)" },
-                { label: "SL", value: result.stopLoss, color: "var(--bear)" },
-                { label: "T1", value: result.target1, color: "var(--bull)" },
-                { label: "T2", value: result.target2, color: "var(--bull)" },
-                ...(result.target3 ? [{ label: "T3", value: result.target3, color: "var(--bull)" }] : [])
-              ]
-        }
-      />
-
-      <ExchangeStatus
-        attempts={result.dataSource.attempts}
-        candleSource={result.dataSource.candles}
-        tickerSource={result.dataSource.ticker}
-      />
-
-      <section className="rounded-xl border border-border bg-card/50 p-5">
-        <h3 className="text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-          Confluence Evidence Breakdown
+      {/* Main Chart */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Live {result.timeframe.toUpperCase()} Price Action & Strategy Map
         </h3>
-        <ul className="mt-3 space-y-3">
-          {result.reasoning.map((r) => (
-            <li key={r.label} className="border-l-2 border-primary/50 pl-3">
-              <p className="text-xs font-semibold uppercase tracking-wider text-primary font-mono">
-                {r.label}
-              </p>
-              <p className="mt-0.5 text-sm leading-relaxed text-foreground/90">{r.detail}</p>
-            </li>
-          ))}
-        </ul>
-        {result.invalidation ? (
-          <div className="mt-4 rounded-lg border border-bear/30 bg-bear/5 p-3">
-            <p className="text-[10px] font-semibold uppercase tracking-widest text-bear">
-              Structural Invalidation Line
-            </p>
-            <p className="mt-1 text-sm text-foreground/90">{result.invalidation}</p>
-          </div>
-        ) : null}
+        <PriceChart candles={result.candles} levels={levels} />
       </section>
 
-      <section>
-        <h3 className="mb-3 text-sm font-semibold uppercase tracking-widest text-muted-foreground">
-          Indicator readings
+      {/* Technical Indicators Grid */}
+      <section className="space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Computed Indicators ({result.timeframe.toUpperCase()})
         </h3>
-        <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3 lg:grid-cols-6">
           <Stat
             label="RSI (14)"
-            value={result.indicators.rsi.toFixed(1)}
+            value={String(result.indicators.rsi)}
             hint={
               result.indicators.rsi > 70
-                ? "overbought"
+                ? "Overbought"
                 : result.indicators.rsi < 30
-                  ? "oversold"
-                  : "neutral zone"
+                  ? "Oversold"
+                  : "Neutral"
             }
-          />
-          <Stat
-            label="MACD hist"
-            value={result.indicators.macdHistogram.toFixed(4)}
-            hint={result.indicators.macdHistogram >= 0 ? "bullish cross" : "bearish cross"}
-          />
-          <Stat label="Trend" value={result.indicators.trend} hint="EMA 20/50/200 stack" />
-          <Stat
-            label="Volume"
-            value={result.indicators.volumeLabel}
-            hint={`${result.indicators.volumeRatio}x baseline`}
           />
           <Stat label="EMA 20" value={`$${fmtPrice(result.indicators.ema20)}`} />
           <Stat label="EMA 50" value={`$${fmtPrice(result.indicators.ema50)}`} />
           <Stat label="EMA 200" value={`$${fmtPrice(result.indicators.ema200)}`} />
           <Stat
-            label="ATR (14)"
+            label="ATR"
             value={`$${fmtPrice(result.indicators.atr)}`}
             hint={`${result.indicators.atrPct}% of price`}
           />
-          <Stat label="Swing high" value={`$${fmtPrice(result.indicators.swingHigh)}`} />
-          <Stat label="Swing low" value={`$${fmtPrice(result.indicators.swingLow)}`} />
-          <Stat label="24h high" value={`$${fmtPrice(result.high24h)}`} />
-          <Stat label="24h low" value={`$${fmtPrice(result.low24h)}`} />
+          <Stat
+            label="Volume"
+            value={result.indicators.volumeLabel}
+            hint={`${result.indicators.volumeRatio}x 20-SMA`}
+          />
         </div>
       </section>
 
-      <p className="tabular text-[10px] text-muted-foreground">
-        Generated {new Date(result.generatedAt).toUTCString()} · indicators computed from live exchange candles
-      </p>
+      {/* Confluence Evidence Breakdown */}
+      <section className="rounded-xl border border-border bg-card/60 p-4 space-y-3">
+        <h3 className="text-xs font-semibold uppercase tracking-widest text-muted-foreground">
+          Confluence Evidence Breakdown
+        </h3>
+        <div className="grid gap-2 sm:grid-cols-2">
+          {result.reasoning.map((r, i) => (
+            <div
+              key={i}
+              className="rounded-lg border border-border/50 bg-background/40 p-3 text-xs"
+            >
+              <span className="font-bold text-primary block mb-0.5">{r.label}</span>
+              <p className="text-muted-foreground leading-relaxed">{r.detail}</p>
+            </div>
+          ))}
+        </div>
+      </section>
+
+      {/* Invalidation Rules */}
+      <section className="rounded-xl border border-border/80 bg-card/45 p-4">
+        <div className="flex items-center gap-2 text-muted-foreground mb-1.5">
+          <ShieldAlert className="h-4 w-4 text-primary" />
+          <h3 className="text-xs font-semibold uppercase tracking-widest">
+            Structural Invalidation Trigger
+          </h3>
+        </div>
+        <p className="text-xs text-muted-foreground leading-relaxed">{result.invalidation}</p>
+      </section>
+
+      {/* Exchange Status */}
+      <ExchangeStatus attempts={result.dataSource.attempts} />
     </div>
   );
 }

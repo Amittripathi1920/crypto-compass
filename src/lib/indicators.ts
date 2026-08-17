@@ -196,7 +196,7 @@ export function findSweetSpot(
   },
   price: number,
   atr: number,
-  isLong: boolean
+  isLong: boolean,
 ): ConfluenceResult {
   const fib50 = ind.swingHigh - 0.5 * (ind.swingHigh - ind.swingLow);
   const fib618 = ind.swingHigh - 0.618 * (ind.swingHigh - ind.swingLow);
@@ -265,9 +265,7 @@ export function findSweetSpot(
 
     // High-probability take profits
     // Target 1: Local Swing High - 0.1 * ATR (guarantees exit before major resistance wicks)
-    target1 = ind.swingHigh > entry
-      ? ind.swingHigh - 0.1 * atr
-      : entry + 2.0 * atr;
+    target1 = ind.swingHigh > entry ? ind.swingHigh - 0.1 * atr : entry + 2.0 * atr;
 
     // Target 2: Strict 3.0x Risk multiple from Entry
     const risk = entry - stopLoss;
@@ -330,9 +328,8 @@ export function findSweetSpot(
 
     // High-probability take profits
     // Target 1: Local Swing Low + 0.1 * ATR
-    target1 = ind.swingLow > 0 && ind.swingLow < entry
-      ? ind.swingLow + 0.1 * atr
-      : entry - 2.0 * atr;
+    target1 =
+      ind.swingLow > 0 && ind.swingLow < entry ? ind.swingLow + 0.1 * atr : entry - 2.0 * atr;
 
     // Target 2: Strict 3.0x Risk multiple
     const risk = stopLoss - entry;
@@ -371,4 +368,3 @@ export function rsiSeries(closes: number[], period = 14): number[] {
 
   return result;
 }
-

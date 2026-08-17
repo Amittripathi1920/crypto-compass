@@ -67,12 +67,18 @@ function findPivots(candles: Candle[], window = 4): Pivot[] {
 }
 
 // Compute volume verification ratio comparing breakout volume to consolidation average
-function getVolumeRatio(candles: Candle[], startIdx: number, breakoutIdx: number): { ratio: number; status: "verified" | "steady" | "weak" } {
+function getVolumeRatio(
+  candles: Candle[],
+  startIdx: number,
+  breakoutIdx: number,
+): { ratio: number; status: "verified" | "steady" | "weak" } {
   if (breakoutIdx <= startIdx || breakoutIdx >= candles.length) {
     return { ratio: 1.0, status: "steady" };
   }
   const consolidationCandles = candles.slice(startIdx, breakoutIdx);
-  const avgConsolidationVol = consolidationCandles.reduce((sum, c) => sum + c.volume, 0) / Math.max(1, consolidationCandles.length);
+  const avgConsolidationVol =
+    consolidationCandles.reduce((sum, c) => sum + c.volume, 0) /
+    Math.max(1, consolidationCandles.length);
   const breakoutVol = candles[breakoutIdx]?.volume ?? avgConsolidationVol;
   const ratio = avgConsolidationVol === 0 ? 1.0 : breakoutVol / avgConsolidationVol;
 
@@ -97,7 +103,7 @@ export function detectPatterns(candles: Candle[]): DetectedPattern[] {
   // Deduplication helper to prevent overlapping duplicate patterns of the same type
   const isDuplicate = (type: string, startIndex: number) => {
     return patterns.some(
-      (p) => p.type === type && Math.abs((p.points[0]?.index ?? -999) - startIndex) < 6
+      (p) => p.type === type && Math.abs((p.points[0]?.index ?? -999) - startIndex) < 6,
     );
   };
 
@@ -610,7 +616,8 @@ export function detectPatterns(candles: Candle[]): DetectedPattern[] {
         category: "bilateral",
         type: "symmetrical_triangle",
         confidence: 89,
-        status: isBullBreak || lastPrice < getPriceAt(l1, slopeLows, lastIdx) ? "broken_out" : "forming",
+        status:
+          isBullBreak || lastPrice < getPriceAt(l1, slopeLows, lastIdx) ? "broken_out" : "forming",
         targetPrice: target,
         invalidPrice: stopLoss,
         volumeStatus: volInfo.status,
@@ -661,11 +668,14 @@ export function detectPatterns(candles: Candle[]): DetectedPattern[] {
   // ----------------------------------------------------
   // 3. CONTINUATION PATTERNS (FLAGS & PENNANTS)
   // ----------------------------------------------------
-  const isBullTrend = lastPrice > candles[lastIdx - 18]?.close!;
+  const isBullTrend = lastPrice > (candles[lastIdx - 18]?.close ?? lastPrice);
   const poleStart = lastIdx - 15;
   const consolidationStart = lastIdx - 8;
 
-  if (consolidationStart > poleStart && !isDuplicate(isBullTrend ? "bull_flag" : "bear_flag", poleStart)) {
+  if (
+    consolidationStart > poleStart &&
+    !isDuplicate(isBullTrend ? "bull_flag" : "bear_flag", poleStart)
+  ) {
     const channelLow = Math.min(...candles.slice(consolidationStart, lastIdx).map((c) => c.low));
     const channelHigh = Math.max(...candles.slice(consolidationStart, lastIdx).map((c) => c.high));
 
@@ -688,14 +698,14 @@ export function detectPatterns(candles: Candle[]): DetectedPattern[] {
         breakoutVolumeRatio: Number(volInfo.ratio.toFixed(2)),
         description: `Bull Flag continuation pattern. The consolidation channel slants slightly downward after a strong vertical flagpole. A breakout above resistance targets $${target.toLocaleString()} with stop-loss below the channel floor at $${stopLoss.toLocaleString()}.`,
         points: [
-          { index: poleStart, price: candles[poleStart]?.low!, label: "Pole Start" },
+          { index: poleStart, price: candles[poleStart]?.low ?? lastPrice, label: "Pole Start" },
           { index: consolidationStart, price: channelHigh, label: "Flag top" },
         ],
         lines: [
           // Flagpole
           {
             startIndex: poleStart,
-            startPrice: candles[poleStart]?.low!,
+            startPrice: candles[poleStart]?.low ?? lastPrice,
             endIndex: consolidationStart,
             endPrice: channelHigh,
             label: "Impulse Pole",
@@ -753,14 +763,14 @@ export function detectPatterns(candles: Candle[]): DetectedPattern[] {
         breakoutVolumeRatio: Number(volInfo.ratio.toFixed(2)),
         description: `Bear Flag continuation pattern. The consolidation channel slants slightly upward after a sharp vertical decline. A breakdown below support targets $${target.toLocaleString()} with stop-loss above the channel ceiling at $${stopLoss.toLocaleString()}.`,
         points: [
-          { index: poleStart, price: candles[poleStart]?.high!, label: "Pole Start" },
+          { index: poleStart, price: candles[poleStart]?.high ?? lastPrice, label: "Pole Start" },
           { index: consolidationStart, price: channelLow, label: "Flag base" },
         ],
         lines: [
           // Flagpole
           {
             startIndex: poleStart,
-            startPrice: candles[poleStart]?.high!,
+            startPrice: candles[poleStart]?.high ?? lastPrice,
             endIndex: consolidationStart,
             endPrice: channelLow,
             label: "Impulse Pole",

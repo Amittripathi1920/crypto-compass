@@ -1,5 +1,7 @@
 import type { Candle } from "./indicators";
 import type { ProviderId, Timeframe } from "./coins";
+import type { MarketRegime, EngineConfig } from "./engine/types";
+import type { ExchangeId, ExchangeAttempt } from "./market.server";
 
 export type SignalRequest = {
   symbol: string;
@@ -7,7 +9,7 @@ export type SignalRequest = {
   provider: ProviderId;
   model?: string | undefined;
   apiKey?: string | undefined;
-  config?: any;
+  config?: Partial<EngineConfig> | undefined;
 };
 
 export type SignalResult = {
@@ -16,31 +18,34 @@ export type SignalResult = {
   generatedAt: string;
   modelUsed: string;
   dataSource: {
+    exchange: ExchangeId;
     candles: string;
     ticker: string;
-    attempts: { exchange: string; ok: boolean; ms: number; error?: string }[];
+    attempts: ExchangeAttempt[];
   };
   currentPrice: number;
   change24hPct: number;
   high24h: number;
   low24h: number;
-  marketRegime: string;
-  sentiment?: { value: number; label: string } | null;
+  marketRegime: MarketRegime;
+  sentiment?: { value: number; label: string } | null | undefined;
   direction: "LONG" | "SHORT" | "NO TRADE";
-  confidence: number;
+  confluenceScore: number;
+  confidence: "High" | "Moderate" | "Low";
+  directionalEdge: number;
+  longScore: number;
+  shortScore: number;
   entry: number;
   stopLoss: number;
   target1: number;
   target2: number;
-  target3?: number;
-  setupScore?: number;
-  entryScore?: number;
-  finalScore?: number;
+  target3?: number | undefined;
   riskReward: number;
   summary: string;
   reasoning: { label: string; detail: string }[];
-  rejectionReasons?: string[];
+  rejectionReasons: string[];
   invalidation: string;
+  setupType?: string[] | undefined;
   indicators: {
     rsi: number;
     macd: number;
@@ -58,4 +63,8 @@ export type SignalResult = {
     volumeRatio: number;
   };
   candles: Candle[];
+  // Legacy aliases
+  setupScore?: number | undefined;
+  entryScore?: number | undefined;
+  finalScore?: number | undefined;
 };

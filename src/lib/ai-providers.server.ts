@@ -1,3 +1,4 @@
+import { z } from "zod";
 import type { ProviderId } from "./coins";
 
 type ChatArgs = {
@@ -67,8 +68,7 @@ const ADAPTERS: Record<ProviderId, ProviderAdapter> = {
 
 export async function runChat(args: ChatArgs): Promise<string> {
   const adapter = ADAPTERS[args.provider];
-  
-  // Resolve key: client-provided key has priority, fall back to environment variables
+
   let key = args.apiKey?.trim();
   if (!key) {
     if (args.provider === "lovable") {
@@ -115,6 +115,13 @@ export async function runChat(args: ChatArgs): Promise<string> {
   return content;
 }
 
+export const AiExplanationSchema = z.object({
+  summary: z.string().min(5).max(1200),
+  invalidation: z.string().min(5).max(600),
+});
+
+export type AiExplanation = z.infer<typeof AiExplanationSchema>;
+
 export function parseJsonLoose(text: string): Record<string, unknown> {
   const cleaned = text
     .trim()
@@ -130,5 +137,13 @@ export function parseJsonLoose(text: string): Record<string, unknown> {
       return JSON.parse(cleaned.slice(start, end + 1)) as Record<string, unknown>;
     }
     throw new Error("Could not read the AI analysis. Try again.");
+  }
+}
+
+export function validateAiExplanation(rawJson: unknown): AiExplanation | null {
+  try {
+    return AiExplanationSchema.parse(rawJson);
+  } catch {
+    return null;
   }
 }

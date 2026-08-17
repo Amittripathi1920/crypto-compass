@@ -46,9 +46,7 @@
               "description": "Coin symbol in upper case, e.g. BTC, ETH, SOL."
             }
           },
-          "required": [
-            "symbol"
-          ]
+          "required": ["symbol"]
         },
         "outputSchema": null
       },
@@ -71,19 +69,11 @@
             },
             "timeframe": {
               "type": "string",
-              "enum": [
-                "4h",
-                "8h",
-                "1d",
-                "1w"
-              ],
+              "enum": ["4h", "8h", "1d", "1w"],
               "description": "Candle timeframe."
             }
           },
-          "required": [
-            "symbol",
-            "timeframe"
-          ]
+          "required": ["symbol", "timeframe"]
         },
         "outputSchema": null
       },
@@ -106,19 +96,11 @@
             },
             "timeframe": {
               "type": "string",
-              "enum": [
-                "4h",
-                "8h",
-                "1d",
-                "1w"
-              ],
+              "enum": ["4h", "8h", "1d", "1w"],
               "description": "Candle timeframe."
             }
           },
-          "required": [
-            "symbol",
-            "timeframe"
-          ]
+          "required": ["symbol", "timeframe"]
         },
         "outputSchema": null
       },
@@ -157,19 +139,11 @@
             },
             "timeframe": {
               "type": "string",
-              "enum": [
-                "4h",
-                "8h",
-                "1d",
-                "1w"
-              ],
+              "enum": ["4h", "8h", "1d", "1w"],
               "description": "Analysis timeframe."
             }
           },
-          "required": [
-            "symbol",
-            "timeframe"
-          ]
+          "required": ["symbol", "timeframe"]
         },
         "outputSchema": null
       }

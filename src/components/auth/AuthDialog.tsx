@@ -47,8 +47,8 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               toast.success("Successfully logged in!");
               onOpenChange(false);
               setLoading(false);
-            }
-          }
+            },
+          },
         });
       } else {
         if (!name.trim()) {
@@ -70,11 +70,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               toast.success("Account created successfully!");
               onOpenChange(false);
               setLoading(false);
-            }
-          }
+            },
+          },
         });
       }
-    } catch (err: any) {
+    } catch (err: unknown) {
       console.error("[auth] Submission error:", err);
       toast.error("An unexpected authentication error occurred.");
       setLoading(false);
@@ -96,7 +96,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
           </DialogDescription>
         </DialogHeader>
 
-        <Tabs value={activeTab} onValueChange={(v) => setActiveTab(v as any)} className="w-full">
+        <Tabs
+          value={activeTab}
+          onValueChange={(v) => setActiveTab(v as "login" | "signup")}
+          className="w-full"
+        >
           <TabsList className="grid w-full grid-cols-2 bg-muted/20 border border-border/40 p-0.5 rounded-lg text-xs font-semibold uppercase tracking-wider">
             <TabsTrigger value="login" disabled={loading} className="rounded-md py-1">
               Log In
@@ -156,7 +160,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
               </div>
             </div>
 
-            <Button type="submit" disabled={loading} className="w-full mt-2 font-bold uppercase tracking-widest text-xs">
+            <Button
+              type="submit"
+              disabled={loading}
+              className="w-full mt-2 font-bold uppercase tracking-widest text-xs"
+            >
               {loading ? (
                 <>
                   <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Processing…
@@ -171,7 +179,9 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
 
           <div className="relative flex py-3 items-center">
             <div className="flex-grow border-t border-border/40"></div>
-            <span className="flex-shrink mx-3 text-[9px] text-muted-foreground uppercase tracking-widest font-semibold">Or continue with</span>
+            <span className="flex-shrink mx-3 text-[9px] text-muted-foreground uppercase tracking-widest font-semibold">
+              Or continue with
+            </span>
             <div className="flex-grow border-t border-border/40"></div>
           </div>
 
@@ -186,9 +196,11 @@ export function AuthDialog({ open, onOpenChange }: AuthDialogProps) {
                   provider: "google",
                   callbackURL: window.location.href,
                 });
-              } catch (err: any) {
+              } catch (err: unknown) {
                 console.error("[auth] Google sign in failed:", err);
-                toast.error(err.message || "Failed to sign in with Google.");
+                const message =
+                  err instanceof Error ? err.message : "Failed to sign in with Google.";
+                toast.error(message);
                 setLoading(false);
               }
             }}

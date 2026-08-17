@@ -1,12 +1,13 @@
 import { createServerFn } from "@tanstack/react-start";
 import { z } from "zod";
-import { db } from "./db";
-import { trackedTrades, user, session } from "./db/schema";
-import { eq, and, inArray, desc } from "drizzle-orm";
-import { createRemoteJWKSet, jwtVerify } from "jose";
+import { db } from "@/lib/db";
+import { trackedTrades, user } from "@/lib/db/schema";
+import { eq, desc, and, inArray } from "drizzle-orm";
+import { jwtVerify, createRemoteJWKSet } from "jose";
+import type { Timeframe } from "./coins";
+import type { TradeStatus, TrackerHistoryLog, TrackedTrade } from "./tracker-types";
 
-// Zod Schema matching tracker types
-const TrackedTradeSchema = z.object({
+export const TrackedTradeSchema = z.object({
   id: z.string(),
   symbol: z.string(),
   timeframe: z.enum(["5m", "15m", "1h", "4h", "8h", "1d", "1w"]),
@@ -15,20 +16,38 @@ const TrackedTradeSchema = z.object({
   stopLoss: z.number(),
   target1: z.number(),
   target2: z.number(),
-  leverage: z.number(),
-  balance: z.number(),
+  leverage: z.number().default(1),
+  balance: z.number().default(1000),
   entryTime: z.number(),
   fillTime: z.number().optional(),
   closeTime: z.number().optional(),
-  status: z.enum(["PENDING", "ACTIVE", "TP1_HIT", "TP2_HIT", "SL_HIT", "BE_HIT", "CANCELLED", "MISSED"]),
+  status: z.enum([
+    "PENDING",
+    "ACTIVE",
+    "TP1_HIT",
+    "TP2_HIT",
+    "SL_HIT",
+    "BE_HIT",
+    "CANCELLED",
+    "MISSED",
+  ]),
   currentPrice: z.number().optional(),
   history: z.array(
     z.object({
       time: z.number(),
-      status: z.enum(["PENDING", "ACTIVE", "TP1_HIT", "TP2_HIT", "SL_HIT", "BE_HIT", "CANCELLED", "MISSED"]),
+      status: z.enum([
+        "PENDING",
+        "ACTIVE",
+        "TP1_HIT",
+        "TP2_HIT",
+        "SL_HIT",
+        "BE_HIT",
+        "CANCELLED",
+        "MISSED",
+      ]),
       price: z.number(),
       detail: z.string(),
-    })
+    }),
   ),
 });
 
@@ -39,14 +58,14 @@ export const validateTrades = createServerFn({ method: "POST" })
   .validator((input: unknown) => InputSchema.parse(input))
   .handler(async ({ data }) => {
     const { validateActiveTrades } = await import("./tracker.server");
-    return validateActiveTrades(data as any);
+    return validateActiveTrades(data as TrackedTrade[]);
   });
 
 const JWKS = createRemoteJWKSet(
   new URL(
-    process.env['NEON_JWKS_URL'] || 
-    "https://ep-calm-mountain-ayvot686.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth/.well-known/jwks.json"
-  )
+    process.env["NEON_JWKS_URL"] ||
+      "https://ep-calm-mountain-ayvot686.neonauth.c-5.us-east-2.aws.neon.tech/neondb/auth/.well-known/jwks.json",
+  ),
 );
 
 // Validate user JWT token using Neon JWKS
@@ -58,10 +77,7 @@ async function getSessionUser(token: string) {
     const userId = payload.sub;
     if (!userId) return null;
 
-    const [dbUser] = await db
-      .select()
-      .from(user)
-      .where(eq(user.id, userId));
+    const [dbUser] = await db.select().from(user).where(eq(user.id, userId));
 
     return dbUser || null;
   } catch (e) {
@@ -88,10 +104,10 @@ export const getUserTrades = createServerFn({ method: "POST" })
       fillTime: r.fillTime ?? undefined,
       closeTime: r.closeTime ?? undefined,
       currentPrice: r.currentPrice ?? undefined,
-      timeframe: r.timeframe as any,
-      direction: r.direction as any,
-      status: r.status as any,
-      history: r.history as any,
+      timeframe: r.timeframe as Timeframe,
+      direction: r.direction as "LONG" | "SHORT",
+      status: r.status as TradeStatus,
+      history: (r.history as TrackerHistoryLog[]) || [],
     }));
   });
 
@@ -109,21 +125,21 @@ export const syncUserTrades = createServerFn({ method: "POST" })
       .where(
         and(
           eq(trackedTrades.userId, user.id),
-          inArray(trackedTrades.status, ["PENDING", "ACTIVE", "TP1_HIT"])
-        )
+          inArray(trackedTrades.status, ["PENDING", "ACTIVE", "TP1_HIT"]),
+        ),
       );
 
     if (activeRows.length > 0) {
       const { validateActiveTrades } = await import("./tracker.server");
-      const typedActive = activeRows.map((r) => ({
+      const typedActive: TrackedTrade[] = activeRows.map((r) => ({
         ...r,
         fillTime: r.fillTime ?? undefined,
         closeTime: r.closeTime ?? undefined,
         currentPrice: r.currentPrice ?? undefined,
-        timeframe: r.timeframe as any,
-        direction: r.direction as any,
-        status: r.status as any,
-        history: r.history as any,
+        timeframe: r.timeframe as Timeframe,
+        direction: r.direction as "LONG" | "SHORT",
+        status: r.status as TradeStatus,
+        history: (r.history as TrackerHistoryLog[]) || [],
       }));
 
       const updated = await validateActiveTrades(typedActive);
@@ -131,7 +147,10 @@ export const syncUserTrades = createServerFn({ method: "POST" })
       // Write any modified status back to the database
       for (const trade of updated) {
         const original = activeRows.find((r) => r.id === trade.id);
-        if (original && (original.status !== trade.status || original.currentPrice !== trade.currentPrice)) {
+        if (
+          original &&
+          (original.status !== trade.status || original.currentPrice !== trade.currentPrice)
+        ) {
           await db
             .update(trackedTrades)
             .set({
@@ -158,10 +177,10 @@ export const syncUserTrades = createServerFn({ method: "POST" })
       fillTime: r.fillTime ?? undefined,
       closeTime: r.closeTime ?? undefined,
       currentPrice: r.currentPrice ?? undefined,
-      timeframe: r.timeframe as any,
-      direction: r.direction as any,
-      status: r.status as any,
-      history: r.history as any,
+      timeframe: r.timeframe as Timeframe,
+      direction: r.direction as "LONG" | "SHORT",
+      status: r.status as TradeStatus,
+      history: (r.history as TrackerHistoryLog[]) || [],
     }));
   });
 
@@ -171,7 +190,7 @@ export const dbTrackTrade = createServerFn({ method: "POST" })
     z.object({
       trade: TrackedTradeSchema,
       token: z.string(),
-    })
+    }),
   )
   .handler(async ({ data }) => {
     const user = await getSessionUser(data.token);
@@ -215,7 +234,7 @@ export const dbCancelTrade = createServerFn({ method: "POST" })
 
     if (!original) throw new Error("Trade record not found");
 
-    const history = (original.history as any[]) || [];
+    const history = (original.history as TrackerHistoryLog[]) || [];
     history.push({
       time: Date.now(),
       status: "CANCELLED",
@@ -230,12 +249,12 @@ export const dbCancelTrade = createServerFn({ method: "POST" })
         closeTime: Date.now(),
         history,
       })
-      .where(and(eq(trackedTrades.id, data.id), eq(trackedTrades.userId, user.id)));
+      .where(eq(trackedTrades.id, data.id));
 
     return { success: true };
   });
 
-// Delete trade from database history
+// Delete trade setup completely from database
 export const dbRemoveTrade = createServerFn({ method: "POST" })
   .validator(z.object({ id: z.string(), token: z.string() }))
   .handler(async ({ data }) => {

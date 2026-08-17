@@ -45,7 +45,7 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
           "MISSED",
           trade.stopLoss,
           `Stop Loss level ($${trade.stopLoss.toLocaleString()}) touched before Entry ($${trade.entry.toLocaleString()}) was filled. Trade setup invalidated (no fill).`,
-          c.time
+          c.time,
         );
         break;
       }
@@ -53,7 +53,12 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
       // Check if price touched Entry to fill the limit order
       if (hitEntry) {
         fillTime = c.time;
-        addLog("ACTIVE", trade.entry, `Limit order filled at $${trade.entry.toLocaleString()}`, c.time);
+        addLog(
+          "ACTIVE",
+          trade.entry,
+          `Limit order filled at $${trade.entry.toLocaleString()}`,
+          c.time,
+        );
       } else {
         continue;
       }
@@ -66,22 +71,24 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
       if (hitStop && hitT1) {
         // Conservative assumption: hit stop loss first
         closeTime = c.time;
-        const lossVal = trade.balance * trade.leverage * (Math.abs(trade.entry - trade.stopLoss) / trade.entry);
+        const lossVal =
+          trade.balance * trade.leverage * (Math.abs(trade.entry - trade.stopLoss) / trade.entry);
         addLog(
           "SL_HIT",
           trade.stopLoss,
           `Stop Loss hit at $${trade.stopLoss.toLocaleString()} (Estimated Loss: -$${lossVal.toFixed(2)})`,
-          c.time
+          c.time,
         );
         break;
       } else if (hitStop) {
         closeTime = c.time;
-        const lossVal = trade.balance * trade.leverage * (Math.abs(trade.entry - trade.stopLoss) / trade.entry);
+        const lossVal =
+          trade.balance * trade.leverage * (Math.abs(trade.entry - trade.stopLoss) / trade.entry);
         addLog(
           "SL_HIT",
           trade.stopLoss,
           `Stop Loss hit at $${trade.stopLoss.toLocaleString()} (Estimated Loss: -$${lossVal.toFixed(2)})`,
-          c.time
+          c.time,
         );
         break;
       } else if (hitT1) {
@@ -89,7 +96,7 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
           "TP1_HIT",
           trade.target1,
           `Target 1 reached at $${trade.target1.toLocaleString()}. Secured 50% profit. Stop Loss trailed to Break-Even ($${trade.entry.toLocaleString()}).`,
-          c.time
+          c.time,
         );
       }
     }
@@ -105,7 +112,7 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
           "BE_HIT",
           trade.entry,
           `Position closed at Break-Even stop ($${trade.entry.toLocaleString()}) after wicking back.`,
-          c.time
+          c.time,
         );
         break;
       } else if (hitBE) {
@@ -114,7 +121,7 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
           "BE_HIT",
           trade.entry,
           `Position closed at Break-Even stop ($${trade.entry.toLocaleString()}).`,
-          c.time
+          c.time,
         );
         break;
       } else if (hitT2) {
@@ -123,7 +130,7 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
           "TP2_HIT",
           trade.target2,
           `Target 2 reached at $${trade.target2.toLocaleString()}. Position fully closed in profit.`,
-          c.time
+          c.time,
         );
         break;
       }
@@ -141,14 +148,22 @@ export function validateTradeHistory(trade: TrackedTrade, candles: Candle[]): Tr
 
 function getTimeframeMs(tf: string): number {
   switch (tf) {
-    case "5m": return 5 * 60 * 1000;
-    case "15m": return 15 * 60 * 1000;
-    case "1h": return 60 * 60 * 1000;
-    case "4h": return 4 * 60 * 60 * 1000;
-    case "8h": return 8 * 60 * 60 * 1000;
-    case "1d": return 24 * 60 * 60 * 1000;
-    case "1w": return 7 * 24 * 60 * 60 * 1000;
-    default: return 4 * 60 * 60 * 1000;
+    case "5m":
+      return 5 * 60 * 1000;
+    case "15m":
+      return 15 * 60 * 1000;
+    case "1h":
+      return 60 * 60 * 1000;
+    case "4h":
+      return 4 * 60 * 60 * 1000;
+    case "8h":
+      return 8 * 60 * 60 * 1000;
+    case "1d":
+      return 24 * 60 * 60 * 1000;
+    case "1w":
+      return 7 * 24 * 60 * 60 * 1000;
+    default:
+      return 4 * 60 * 60 * 1000;
   }
 }
 
@@ -166,7 +181,7 @@ export async function validateActiveTrades(trades: TrackedTrade[]): Promise<Trac
       } catch (e) {
         console.error(`[tracker] Failed to fetch ticker for ${sym}:`, e);
       }
-    })
+    }),
   );
 
   const results: TrackedTrade[] = [];
@@ -192,7 +207,7 @@ export async function validateActiveTrades(trades: TrackedTrade[]): Promise<Trac
     try {
       const res = await fetchCandles(trade.symbol, trade.timeframe);
       const updated = validateTradeHistory(trade, res.value);
-      
+
       if (livePrice !== undefined) {
         updated.currentPrice = livePrice;
       } else {

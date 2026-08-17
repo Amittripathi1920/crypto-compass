@@ -113,7 +113,6 @@
   --font-mono-num: "JetBrains Mono", ui-monospace, monospace;
 }
 
-
 @layer base {
   * {
     border-color: var(--color-border);

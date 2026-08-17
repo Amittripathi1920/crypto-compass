@@ -1,6 +1,7 @@
 import type { Timeframe } from "./coins";
 
-export type TradeStatus = "PENDING" | "ACTIVE" | "TP1_HIT" | "TP2_HIT" | "SL_HIT" | "BE_HIT" | "CANCELLED" | "MISSED";
+export type TradeStatus =
+  "PENDING" | "ACTIVE" | "TP1_HIT" | "TP2_HIT" | "SL_HIT" | "BE_HIT" | "CANCELLED" | "MISSED";
 
 export type TrackerHistoryLog = {
   time: number;

@@ -23,7 +23,9 @@ const RSI_TOP = VOL_TOP + VOL_H + 22;
 const RSI_H = 76;
 
 function line(points: { x: number; y: number }[]) {
-  return points.map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`).join(" ");
+  return points
+    .map((p, i) => `${i === 0 ? "M" : "L"}${p.x.toFixed(1)} ${p.y.toFixed(1)}`)
+    .join(" ");
 }
 
 export function PriceChartInner({
@@ -47,7 +49,7 @@ export function PriceChartInner({
     const fvgsList = ZoneEngine.detectFVGs(candles);
     const liquidityList = LiquidityEngine.mapLiquidity(candles, [], structure.swings, atrVal);
     const sweep = LiquidityEngine.detectSweep(candles, liquidityList, atrVal);
-    
+
     return { structure, zones: zonesList, fvgs: fvgsList, sweep };
   }, [candles]);
 
@@ -108,11 +110,7 @@ export function PriceChartInner({
   const activeRsi = hover !== null ? rsiValues[hover] : rsiValues[rsiValues.length - 1];
 
   const emaPath = (series: number[], offset: number) =>
-    line(
-      series
-        .map((v, i) => ({ x: x(i + offset), y: y(v) }))
-        .filter((p) => Number.isFinite(p.y)),
-    );
+    line(series.map((v, i) => ({ x: x(i + offset), y: y(v) })).filter((p) => Number.isFinite(p.y)));
 
   return (
     <div className="w-full overflow-hidden rounded-xl border border-border bg-card/60">
@@ -205,59 +203,61 @@ export function PriceChartInner({
         ) : null}
 
         {/* Supply / Demand Zones in background */}
-        {annotations && annotations.zones.map((z) => {
-          const topY = y(z.topPrice);
-          const bottomY = y(z.bottomPrice);
-          const hHeight = Math.abs(bottomY - topY);
-          const startIdx = candles.findIndex((c) => c.time === z.time);
-          const startX = startIdx !== -1 ? x(startIdx) : 0;
-          const zoneWidth = PLOT_W - startX;
-          if (zoneWidth <= 0 || hHeight <= 0) return null;
-          const isDemand = z.type === "DEMAND";
-          
-          return (
-            <rect
-              key={z.id}
-              x={startX}
-              y={Math.min(topY, bottomY)}
-              width={zoneWidth}
-              height={hHeight}
-              fill={isDemand ? "var(--bull)" : "var(--bear)"}
-              opacity={0.06}
-              stroke={isDemand ? "var(--bull)" : "var(--bear)"}
-              strokeWidth={0.5}
-              strokeOpacity={0.3}
-            />
-          );
-        })}
+        {annotations &&
+          annotations.zones.map((z) => {
+            const topY = y(z.topPrice);
+            const bottomY = y(z.bottomPrice);
+            const hHeight = Math.abs(bottomY - topY);
+            const startIdx = candles.findIndex((c) => c.time === z.time);
+            const startX = startIdx !== -1 ? x(startIdx) : 0;
+            const zoneWidth = PLOT_W - startX;
+            if (zoneWidth <= 0 || hHeight <= 0) return null;
+            const isDemand = z.type === "DEMAND";
+
+            return (
+              <rect
+                key={z.id}
+                x={startX}
+                y={Math.min(topY, bottomY)}
+                width={zoneWidth}
+                height={hHeight}
+                fill={isDemand ? "var(--bull)" : "var(--bear)"}
+                opacity={0.06}
+                stroke={isDemand ? "var(--bull)" : "var(--bear)"}
+                strokeWidth={0.5}
+                strokeOpacity={0.3}
+              />
+            );
+          })}
 
         {/* FVGs in background */}
-        {annotations && annotations.fvgs.map((f, idx) => {
-          const topY = y(f.topPrice);
-          const bottomY = y(f.bottomPrice);
-          const hHeight = Math.abs(bottomY - topY);
-          const startIdx = candles.findIndex((c) => c.time === f.time);
-          const startX = startIdx !== -1 ? x(startIdx) : 0;
-          const zoneWidth = PLOT_W - startX;
-          if (zoneWidth <= 0 || hHeight <= 0) return null;
-          const isBull = f.direction === "BULLISH";
-          
-          return (
-            <rect
-              key={`fvg_${idx}`}
-              x={startX}
-              y={Math.min(topY, bottomY)}
-              width={zoneWidth}
-              height={hHeight}
-              fill={isBull ? "#3b82f6" : "#f97316"}
-              opacity={0.04}
-              stroke={isBull ? "#3b82f6" : "#f97316"}
-              strokeWidth={0.5}
-              strokeDasharray="2 2"
-              strokeOpacity={0.25}
-            />
-          );
-        })}
+        {annotations &&
+          annotations.fvgs.map((f, idx) => {
+            const topY = y(f.topPrice);
+            const bottomY = y(f.bottomPrice);
+            const hHeight = Math.abs(bottomY - topY);
+            const startIdx = candles.findIndex((c) => c.time === f.time);
+            const startX = startIdx !== -1 ? x(startIdx) : 0;
+            const zoneWidth = PLOT_W - startX;
+            if (zoneWidth <= 0 || hHeight <= 0) return null;
+            const isBull = f.direction === "BULLISH";
+
+            return (
+              <rect
+                key={`fvg_${idx}`}
+                x={startX}
+                y={Math.min(topY, bottomY)}
+                width={zoneWidth}
+                height={hHeight}
+                fill={isBull ? "#3b82f6" : "#f97316"}
+                opacity={0.04}
+                stroke={isBull ? "#3b82f6" : "#f97316"}
+                strokeWidth={0.5}
+                strokeDasharray="2 2"
+                strokeOpacity={0.25}
+              />
+            );
+          })}
 
         {/* Risk/Reward translucent zones */}
         {rrZones ? (
@@ -363,83 +363,86 @@ export function PriceChartInner({
         />
 
         {/* BOS & CHoCH Lines */}
-        {annotations && annotations.structure.bos.map((b, idx) => {
-          const ly = y(b.price);
-          const startIdx = b.sourceSwingIndex;
-          const startX = startIdx >= 0 && startIdx < candles.length ? x(startIdx) : 0;
-          return (
-            <g key={`bos_${idx}`}>
-              <line
-                x1={startX}
-                x2={PLOT_W}
-                y1={ly}
-                y2={ly}
-                stroke={b.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
-                strokeWidth={0.75}
-                strokeDasharray="3 3"
-                opacity={0.5}
-              />
-              <text
-                x={startX + 5}
-                y={ly - 3}
-                fill={b.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
-                fontSize={8}
-                fontWeight={500}
-                opacity={0.7}
-              >
-                BOS
-              </text>
-            </g>
-          );
-        })}
+        {annotations &&
+          annotations.structure.bos.map((b, idx) => {
+            const ly = y(b.price);
+            const startIdx = b.sourceSwingIndex;
+            const startX = startIdx >= 0 && startIdx < candles.length ? x(startIdx) : 0;
+            return (
+              <g key={`bos_${idx}`}>
+                <line
+                  x1={startX}
+                  x2={PLOT_W}
+                  y1={ly}
+                  y2={ly}
+                  stroke={b.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                  strokeWidth={0.75}
+                  strokeDasharray="3 3"
+                  opacity={0.5}
+                />
+                <text
+                  x={startX + 5}
+                  y={ly - 3}
+                  fill={b.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                  fontSize={8}
+                  fontWeight={500}
+                  opacity={0.7}
+                >
+                  BOS
+                </text>
+              </g>
+            );
+          })}
 
-        {annotations && annotations.structure.choch.map((c, idx) => {
-          const ly = y(c.price);
-          const startIdx = c.sourceSwingIndex;
-          const startX = startIdx >= 0 && startIdx < candles.length ? x(startIdx) : 0;
-          return (
-            <g key={`choch_${idx}`}>
-              <line
-                x1={startX}
-                x2={PLOT_W}
-                y1={ly}
-                y2={ly}
-                stroke={c.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
-                strokeWidth={0.75}
-                strokeDasharray="3 3"
-                opacity={0.5}
-              />
-              <text
-                x={startX + 5}
-                y={ly - 3}
-                fill={c.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
-                fontSize={8}
-                fontWeight={500}
-                opacity={0.7}
-              >
-                CHoCH
-              </text>
-            </g>
-          );
-        })}
+        {annotations &&
+          annotations.structure.choch.map((c, idx) => {
+            const ly = y(c.price);
+            const startIdx = c.sourceSwingIndex;
+            const startX = startIdx >= 0 && startIdx < candles.length ? x(startIdx) : 0;
+            return (
+              <g key={`choch_${idx}`}>
+                <line
+                  x1={startX}
+                  x2={PLOT_W}
+                  y1={ly}
+                  y2={ly}
+                  stroke={c.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                  strokeWidth={0.75}
+                  strokeDasharray="3 3"
+                  opacity={0.5}
+                />
+                <text
+                  x={startX + 5}
+                  y={ly - 3}
+                  fill={c.type.includes("BULL") ? "var(--bull)" : "var(--bear)"}
+                  fontSize={8}
+                  fontWeight={500}
+                  opacity={0.7}
+                >
+                  CHoCH
+                </text>
+              </g>
+            );
+          })}
 
         {/* Swing Points */}
-        {annotations && annotations.structure.swings.map((s, idx) => {
-          const cx = x(s.index);
-          const cy = s.type === "high" ? y(s.price) - 5 : y(s.price) + 5;
-          return (
-            <circle
-              key={`swing_${idx}`}
-              cx={cx}
-              cy={cy}
-              r={2.5}
-              stroke="var(--neutral)"
-              strokeWidth={0.5}
-              fill="none"
-              opacity={0.4}
-            />
-          );
-        })}
+        {annotations &&
+          annotations.structure.swings.map((s, idx) => {
+            const cx = x(s.index);
+            const cy = s.type === "high" ? y(s.price) - 5 : y(s.price) + 5;
+            return (
+              <circle
+                key={`swing_${idx}`}
+                cx={cx}
+                cy={cy}
+                r={2.5}
+                stroke="var(--neutral)"
+                strokeWidth={0.5}
+                fill="none"
+                opacity={0.4}
+              />
+            );
+          })}
 
         {/* Liquidity Sweeps */}
         {annotations && annotations.sweep && (
@@ -537,20 +540,72 @@ export function PriceChartInner({
           />
 
           {/* RSI Axis Value Tags */}
-          <text x={PLOT_W + 6} y={RSI_TOP + RSI_H * 0.3 + 3.5} fill="currentColor" className="text-muted-foreground" fontSize={8} opacity={0.65}>70</text>
-          <text x={PLOT_W + 6} y={RSI_TOP + RSI_H * 0.5 + 3.5} fill="currentColor" className="text-muted-foreground" fontSize={8} opacity={0.4}>50</text>
-          <text x={PLOT_W + 6} y={RSI_TOP + RSI_H * 0.7 + 3.5} fill="currentColor" className="text-muted-foreground" fontSize={8} opacity={0.65}>30</text>
+          <text
+            x={PLOT_W + 6}
+            y={RSI_TOP + RSI_H * 0.3 + 3.5}
+            fill="currentColor"
+            className="text-muted-foreground"
+            fontSize={8}
+            opacity={0.65}
+          >
+            70
+          </text>
+          <text
+            x={PLOT_W + 6}
+            y={RSI_TOP + RSI_H * 0.5 + 3.5}
+            fill="currentColor"
+            className="text-muted-foreground"
+            fontSize={8}
+            opacity={0.4}
+          >
+            50
+          </text>
+          <text
+            x={PLOT_W + 6}
+            y={RSI_TOP + RSI_H * 0.7 + 3.5}
+            fill="currentColor"
+            className="text-muted-foreground"
+            fontSize={8}
+            opacity={0.65}
+          >
+            30
+          </text>
 
           {/* Panel label */}
-          <text x={2} y={RSI_TOP - 4} fill="currentColor" className="text-muted-foreground" fontSize={8.5} opacity={0.8}>RSI (14)</text>
-          
+          <text
+            x={2}
+            y={RSI_TOP - 4}
+            fill="currentColor"
+            className="text-muted-foreground"
+            fontSize={8.5}
+            opacity={0.8}
+          >
+            RSI (14)
+          </text>
+
           {/* Divider lines */}
-          <line x1={0} x2={PLOT_W} y1={RSI_TOP} y2={RSI_TOP} stroke="var(--grid)" strokeWidth={0.75} />
-          <line x1={0} x2={PLOT_W} y1={RSI_TOP + RSI_H} y2={RSI_TOP + RSI_H} stroke="var(--grid)" strokeWidth={0.75} />
+          <line
+            x1={0}
+            x2={PLOT_W}
+            y1={RSI_TOP}
+            y2={RSI_TOP}
+            stroke="var(--grid)"
+            strokeWidth={0.75}
+          />
+          <line
+            x1={0}
+            x2={PLOT_W}
+            y1={RSI_TOP + RSI_H}
+            y2={RSI_TOP + RSI_H}
+            stroke="var(--grid)"
+            strokeWidth={0.75}
+          />
 
           {/* RSI Curve */}
           <path
-            d={line(rsiValues.map((v, idx) => ({ x: x(idx), y: RSI_TOP + RSI_H - (v / 100) * RSI_H })))}
+            d={line(
+              rsiValues.map((v, idx) => ({ x: x(idx), y: RSI_TOP + RSI_H - (v / 100) * RSI_H })),
+            )}
             fill="none"
             stroke="#f97316"
             strokeWidth={1.25}
@@ -591,9 +646,24 @@ export function PriceChartInner({
                     />
                     {/* Floating Price label on the right */}
                     <g transform={`translate(${PLOT_W + 2}, ${mouseY - 7})`}>
-                      <rect width={PAD_R - 4} height={14} fill="var(--neutral)" rx={2} className="opacity-95" />
-                      <text x={4} y={10.5} fill="var(--background)" fontSize={8.5} fontWeight={600} fontFamily="var(--font-mono-num)">
-                        {fmtPrice(model.top - ((mouseY - PAD_T) / PRICE_H) * (model.top - model.bottom))}
+                      <rect
+                        width={PAD_R - 4}
+                        height={14}
+                        fill="var(--neutral)"
+                        rx={2}
+                        className="opacity-95"
+                      />
+                      <text
+                        x={4}
+                        y={10.5}
+                        fill="var(--background)"
+                        fontSize={8.5}
+                        fontWeight={600}
+                        fontFamily="var(--font-mono-num)"
+                      >
+                        {fmtPrice(
+                          model.top - ((mouseY - PAD_T) / PRICE_H) * (model.top - model.bottom),
+                        )}
                       </text>
                     </g>
                   </g>
@@ -611,9 +681,25 @@ export function PriceChartInner({
                     />
                     {/* Floating RSI label on the right */}
                     <g transform={`translate(${PLOT_W + 2}, ${mouseY - 7})`}>
-                      <rect width={PAD_R - 4} height={14} fill="var(--neutral)" rx={2} className="opacity-95" />
-                      <text x={12} y={10.5} fill="var(--background)" fontSize={8.5} fontWeight={600} fontFamily="var(--font-mono-num)">
-                        {Math.max(0, Math.min(100, Math.round(100 - ((mouseY - RSI_TOP) / RSI_H) * 100)))}
+                      <rect
+                        width={PAD_R - 4}
+                        height={14}
+                        fill="var(--neutral)"
+                        rx={2}
+                        className="opacity-95"
+                      />
+                      <text
+                        x={12}
+                        y={10.5}
+                        fill="var(--background)"
+                        fontSize={8.5}
+                        fontWeight={600}
+                        fontFamily="var(--font-mono-num)"
+                      >
+                        {Math.max(
+                          0,
+                          Math.min(100, Math.round(100 - ((mouseY - RSI_TOP) / RSI_H) * 100)),
+                        )}
                       </text>
                     </g>
                   </g>

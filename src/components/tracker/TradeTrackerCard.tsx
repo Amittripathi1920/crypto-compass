@@ -3,18 +3,18 @@ import { useTradeTracker } from "@/hooks/useTradeTracker";
 import type { TrackedTrade } from "@/lib/tracker-types";
 import { cn } from "@/lib/utils";
 import { fmtPrice } from "../signal/format";
-import { 
-  Play, 
-  CheckCircle2, 
-  XCircle, 
-  AlertTriangle, 
-  RotateCw, 
-  Trash2, 
-  History, 
-  Target, 
-  TrendingUp, 
+import {
+  Play,
+  CheckCircle2,
+  XCircle,
+  AlertTriangle,
+  RotateCw,
+  Trash2,
+  History,
+  Target,
+  TrendingUp,
   ChevronDown,
-  ChevronUp
+  ChevronUp,
 } from "lucide-react";
 
 export function TradeTrackerCard() {
@@ -25,7 +25,8 @@ export function TradeTrackerCard() {
   const getUnrealizedPnL = (trade: TrackedTrade) => {
     if (!trade.currentPrice || trade.status === "PENDING") return null;
     const isLong = trade.direction === "LONG";
-    const priceChangePct = ((trade.currentPrice - trade.entry) / trade.entry) * 100 * (isLong ? 1 : -1);
+    const priceChangePct =
+      ((trade.currentPrice - trade.entry) / trade.entry) * 100 * (isLong ? 1 : -1);
     const levChangePct = priceChangePct * trade.leverage;
     const pnlDollars = trade.balance * (levChangePct / 100);
 
@@ -38,11 +39,16 @@ export function TradeTrackerCard() {
   };
 
   const activeTrades = trades.filter(
-    (t) => t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT"
+    (t) => t.status === "PENDING" || t.status === "ACTIVE" || t.status === "TP1_HIT",
   );
-  
+
   const historyTrades = trades.filter(
-    (t) => t.status === "SL_HIT" || t.status === "TP2_HIT" || t.status === "BE_HIT" || t.status === "CANCELLED" || t.status === "MISSED"
+    (t) =>
+      t.status === "SL_HIT" ||
+      t.status === "TP2_HIT" ||
+      t.status === "BE_HIT" ||
+      t.status === "CANCELLED" ||
+      t.status === "MISSED",
   );
 
   const toggleExpand = (id: string) => {
@@ -110,15 +116,15 @@ export function TradeTrackerCard() {
     const riskAmount = trade.balance * trade.leverage * priceRiskPct;
 
     if (trade.status === "TP2_HIT") {
-      const t1Reward = (Math.abs(trade.target1 - trade.entry) / trade.entry) / priceRiskPct;
-      const t2Reward = (Math.abs(trade.target2 - trade.entry) / trade.entry) / priceRiskPct;
+      const t1Reward = Math.abs(trade.target1 - trade.entry) / trade.entry / priceRiskPct;
+      const t2Reward = Math.abs(trade.target2 - trade.entry) / trade.entry / priceRiskPct;
       const totalR = 0.5 * t1Reward + 0.5 * t2Reward;
       const pnl = totalR * riskAmount;
       return { r: `+${totalR.toFixed(2)}R`, pnl: `+$${pnl.toFixed(2)}`, color: "text-bull" };
     }
 
     if (trade.status === "BE_HIT") {
-      const t1Reward = (Math.abs(trade.target1 - trade.entry) / trade.entry) / priceRiskPct;
+      const t1Reward = Math.abs(trade.target1 - trade.entry) / trade.entry / priceRiskPct;
       const totalR = 0.5 * t1Reward; // second half exited at entry (0R)
       const pnl = totalR * riskAmount;
       return { r: `+${totalR.toFixed(2)}R`, pnl: `+$${pnl.toFixed(2)}`, color: "text-yellow-500" };
@@ -151,7 +157,9 @@ export function TradeTrackerCard() {
               onClick={() => setActiveTab("active")}
               className={cn(
                 "rounded px-3 py-1 transition-colors",
-                activeTab === "active" ? "bg-background text-foreground shadow" : "text-muted-foreground hover:text-foreground"
+                activeTab === "active"
+                  ? "bg-background text-foreground shadow"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Active ({activeTrades.length})
@@ -160,7 +168,9 @@ export function TradeTrackerCard() {
               onClick={() => setActiveTab("history")}
               className={cn(
                 "rounded px-3 py-1 transition-colors",
-                activeTab === "history" ? "bg-background text-foreground shadow" : "text-muted-foreground hover:text-foreground"
+                activeTab === "history"
+                  ? "bg-background text-foreground shadow"
+                  : "text-muted-foreground hover:text-foreground",
               )}
             >
               Closed ({historyTrades.length})
@@ -196,13 +206,20 @@ export function TradeTrackerCard() {
                   key={t.id}
                   className={cn(
                     "rounded-lg border bg-background/30 p-3 transition-colors",
-                    isLong ? "border-bull/20 hover:border-bull/30" : "border-bear/20 hover:border-bear/30"
+                    isLong
+                      ? "border-bull/20 hover:border-bull/30"
+                      : "border-bear/20 hover:border-bear/30",
                   )}
                 >
                   <div className="flex flex-wrap items-center justify-between gap-3">
                     <div>
                       <div className="flex items-center gap-2">
-                        <span className={cn("text-xs font-bold uppercase", isLong ? "text-bull" : "text-bear")}>
+                        <span
+                          className={cn(
+                            "text-xs font-bold uppercase",
+                            isLong ? "text-bull" : "text-bear",
+                          )}
+                        >
                           {isLong ? "▲ LONG" : "▼ SHORT"}
                         </span>
                         <span className="font-semibold text-sm text-foreground">
@@ -213,23 +230,33 @@ export function TradeTrackerCard() {
                         </span>
                       </div>
                       <p className="text-[10px] text-muted-foreground mt-1 tabular">
-                        Size: ${(t.balance * t.leverage).toLocaleString(undefined, { maximumFractionDigits: 2 })} ({t.leverage}x leverage) · Margin: ${t.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                        Size: $
+                        {(t.balance * t.leverage).toLocaleString(undefined, {
+                          maximumFractionDigits: 2,
+                        })}{" "}
+                        ({t.leverage}x leverage) · Margin: $
+                        {t.balance.toLocaleString(undefined, { maximumFractionDigits: 2 })}
                       </p>
                       {t.currentPrice && (
                         <div className="flex flex-wrap items-center gap-1.5 mt-1 text-[10px] tabular">
                           <span className="text-muted-foreground">Live Price:</span>
-                          <span className="font-bold text-foreground">${fmtPrice(t.currentPrice)}</span>
-                          {t.status !== "PENDING" && (() => {
-                            const pnlInfo = getUnrealizedPnL(t);
-                            if (!pnlInfo) return null;
-                            return (
-                              <>
-                                <span className="text-muted-foreground/60 font-light">|</span>
-                                <span className="text-muted-foreground">Unrealized P&L:</span>
-                                <span className={cn("font-bold", pnlInfo.color)}>{pnlInfo.formatted}</span>
-                              </>
-                            );
-                          })()}
+                          <span className="font-bold text-foreground">
+                            ${fmtPrice(t.currentPrice)}
+                          </span>
+                          {t.status !== "PENDING" &&
+                            (() => {
+                              const pnlInfo = getUnrealizedPnL(t);
+                              if (!pnlInfo) return null;
+                              return (
+                                <>
+                                  <span className="text-muted-foreground/60 font-light">|</span>
+                                  <span className="text-muted-foreground">Unrealized P&L:</span>
+                                  <span className={cn("font-bold", pnlInfo.color)}>
+                                    {pnlInfo.formatted}
+                                  </span>
+                                </>
+                              );
+                            })()}
                         </div>
                       )}
                     </div>
@@ -246,7 +273,11 @@ export function TradeTrackerCard() {
                         onClick={() => toggleExpand(t.id)}
                         className="text-muted-foreground hover:text-foreground"
                       >
-                        {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                        {isExpanded ? (
+                          <ChevronUp className="h-4 w-4" />
+                        ) : (
+                          <ChevronDown className="h-4 w-4" />
+                        )}
                       </button>
                     </div>
                   </div>
@@ -255,19 +286,27 @@ export function TradeTrackerCard() {
                   <div className="mt-3 grid grid-cols-4 gap-2 pt-2.5 border-t border-border/40 text-center text-[10px] tabular">
                     <div>
                       <span className="text-muted-foreground block">Entry</span>
-                      <span className="font-bold text-foreground block mt-0.5">${fmtPrice(t.entry)}</span>
+                      <span className="font-bold text-foreground block mt-0.5">
+                        ${fmtPrice(t.entry)}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block">Stop Loss</span>
-                      <span className="font-bold text-bear block mt-0.5">${fmtPrice(t.stopLoss)}</span>
+                      <span className="font-bold text-bear block mt-0.5">
+                        ${fmtPrice(t.stopLoss)}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block">Target 1</span>
-                      <span className="font-bold text-bull block mt-0.5">${fmtPrice(t.target1)}</span>
+                      <span className="font-bold text-bull block mt-0.5">
+                        ${fmtPrice(t.target1)}
+                      </span>
                     </div>
                     <div>
                       <span className="text-muted-foreground block">Target 2</span>
-                      <span className="font-bold text-bull block mt-0.5">${fmtPrice(t.target2)}</span>
+                      <span className="font-bold text-bull block mt-0.5">
+                        ${fmtPrice(t.target2)}
+                      </span>
                     </div>
                   </div>
 
@@ -281,7 +320,10 @@ export function TradeTrackerCard() {
                         {t.history.map((log, idx) => (
                           <li key={idx} className="flex justify-between items-start gap-3">
                             <span className="text-muted-foreground tabular shrink-0">
-                              {new Date(log.time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                              {new Date(log.time).toLocaleTimeString(undefined, {
+                                hour: "2-digit",
+                                minute: "2-digit",
+                              })}
                             </span>
                             <span className="text-foreground/95 flex-1">{log.detail}</span>
                           </li>
@@ -329,7 +371,10 @@ export function TradeTrackerCard() {
                           </div>
                           {t.currentPrice && (
                             <span className="text-[10px] text-muted-foreground block mt-0.5 tabular">
-                              Live: <span className="font-semibold text-foreground">${fmtPrice(t.currentPrice)}</span>
+                              Live:{" "}
+                              <span className="font-semibold text-foreground">
+                                ${fmtPrice(t.currentPrice)}
+                              </span>
                             </span>
                           )}
                           <span className="text-[9px] text-muted-foreground block mt-0.5">
@@ -338,7 +383,12 @@ export function TradeTrackerCard() {
                         </td>
                         <td className="p-3">
                           <div className="flex flex-col gap-1 items-start">
-                            <span className={cn("text-[10px] font-bold uppercase", isLong ? "text-bull" : "text-bear")}>
+                            <span
+                              className={cn(
+                                "text-[10px] font-bold uppercase",
+                                isLong ? "text-bull" : "text-bear",
+                              )}
+                            >
                               {isLong ? "▲ LONG" : "▼ SHORT"}
                             </span>
                             {getStatusBadge(t.status)}
@@ -346,15 +396,26 @@ export function TradeTrackerCard() {
                         </td>
                         <td className="p-3">
                           <div className="flex flex-col gap-0.5 text-[10px] text-muted-foreground">
-                            <span>Entry: <strong className="text-foreground">${fmtPrice(t.entry)}</strong></span>
-                            <span>SL: <strong className="text-bear">${fmtPrice(t.stopLoss)}</strong></span>
-                            <span>T1: <strong className="text-bull">${fmtPrice(t.target1)}</strong> / T2: <strong className="text-bull">${fmtPrice(t.target2)}</strong></span>
+                            <span>
+                              Entry:{" "}
+                              <strong className="text-foreground">${fmtPrice(t.entry)}</strong>
+                            </span>
+                            <span>
+                              SL: <strong className="text-bear">${fmtPrice(t.stopLoss)}</strong>
+                            </span>
+                            <span>
+                              T1: <strong className="text-bull">${fmtPrice(t.target1)}</strong> /
+                              T2: <strong className="text-bull">${fmtPrice(t.target2)}</strong>
+                            </span>
                           </div>
                         </td>
                         <td className="p-3">
                           <div className="text-[10px]">
                             <span className="text-foreground block font-medium">
-                              ${(t.balance * t.leverage).toLocaleString(undefined, { maximumFractionDigits: 2 })}
+                              $
+                              {(t.balance * t.leverage).toLocaleString(undefined, {
+                                maximumFractionDigits: 2,
+                              })}
                             </span>
                             <span className="text-muted-foreground block mt-0.5 text-[9px]">
                               {t.leverage}x (${t.balance.toLocaleString()} margin)
@@ -374,7 +435,11 @@ export function TradeTrackerCard() {
                               className="text-muted-foreground hover:text-foreground p-1 rounded hover:bg-muted/40 transition-colors"
                               title="Toggle Log History"
                             >
-                              {isExpanded ? <ChevronUp className="h-4 w-4" /> : <ChevronDown className="h-4 w-4" />}
+                              {isExpanded ? (
+                                <ChevronUp className="h-4 w-4" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4" />
+                              )}
                             </button>
                             <button
                               onClick={() => removeTrade(t.id)}
@@ -397,7 +462,11 @@ export function TradeTrackerCard() {
                                 {t.history.map((log, idx) => (
                                   <li key={idx} className="flex gap-4">
                                     <span className="text-muted-foreground tabular shrink-0">
-                                      {new Date(log.time).toLocaleDateString()} {new Date(log.time).toLocaleTimeString(undefined, { hour: "2-digit", minute: "2-digit" })}
+                                      {new Date(log.time).toLocaleDateString()}{" "}
+                                      {new Date(log.time).toLocaleTimeString(undefined, {
+                                        hour: "2-digit",
+                                        minute: "2-digit",
+                                      })}
                                     </span>
                                     <span className="text-foreground/90 flex-1">{log.detail}</span>
                                   </li>

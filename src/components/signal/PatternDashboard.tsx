@@ -20,7 +20,7 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
 
   const handleSharePattern = (p: DetectedPattern) => {
     const text = `🔍 Crypto Compass Analysis: ${symbol}/USDT (${timeframe.toUpperCase()})\n📈 Pattern Detected: ${p.name} (${p.confidence}% Confidence)\n📊 Status: ${p.status.toUpperCase().replace("_", " ")}\n🎯 Target: $${p.targetPrice.toLocaleString()}\n🚨 Invalidation: $${p.invalidPrice.toLocaleString()}\n\n📝 Details: ${p.description}`;
-    
+
     try {
       navigator.clipboard.writeText(text);
       toast.success("Pattern analysis details copied to clipboard!");
@@ -33,7 +33,9 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
     return (
       <div className="rounded-xl border border-dashed border-border/60 bg-card/25 p-8 text-center">
         <Compass className="mx-auto h-8 w-8 text-muted-foreground opacity-50" />
-        <h3 className="mt-3 text-sm font-semibold text-foreground">No definitive patterns detected</h3>
+        <h3 className="mt-3 text-sm font-semibold text-foreground">
+          No definitive patterns detected
+        </h3>
         <p className="mt-1 text-xs text-muted-foreground">
           Market consolidation or noise is high on this timeframe. Try switching timeframes.
         </p>
@@ -52,8 +54,9 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
 
       <div className="grid gap-4 sm:grid-cols-2">
         {patterns.map((p) => {
-          const isBullish = p.name.includes("Bottom") || p.name.includes("Bull") || p.name.includes("Ascending");
-          
+          const isBullish =
+            p.name.includes("Bottom") || p.name.includes("Bull") || p.name.includes("Ascending");
+
           return (
             <div
               key={p.id}
@@ -82,7 +85,7 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                         "rounded px-1.5 py-0.5 text-[9px] font-bold uppercase tracking-wider",
                         isBullish
                           ? "bg-bull/15 text-bull border border-bull/30"
-                          : "bg-bear/15 text-bear border border-bear/30"
+                          : "bg-bear/15 text-bear border border-bear/30",
                       )}
                     >
                       {p.status.replace("_", " ")}
@@ -96,7 +99,7 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                       <Maximize2 className="h-3.5 w-3.5" />
                     </Button>
                   </div>
-                  
+
                   {/* Volume Verification Badge */}
                   {p.volumeStatus === "verified" ? (
                     <span className="rounded px-1.5 py-0.25 text-[8px] font-bold bg-green-500/10 text-green-400 border border-green-500/20">
@@ -131,7 +134,11 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                     Target Price
                   </span>
                   <span className="font-bold text-xs text-bull tabular block">
-                    ${p.targetPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {p.targetPrice.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
                 <div className="rounded bg-background/30 p-1.5 border border-border/20">
@@ -139,7 +146,11 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                     Invalidation
                   </span>
                   <span className="font-bold text-xs text-bear tabular block">
-                    ${p.invalidPrice.toLocaleString(undefined, { minimumFractionDigits: 2, maximumFractionDigits: 2 })}
+                    $
+                    {p.invalidPrice.toLocaleString(undefined, {
+                      minimumFractionDigits: 2,
+                      maximumFractionDigits: 2,
+                    })}
                   </span>
                 </div>
               </div>
@@ -161,7 +172,10 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
       </div>
 
       {/* Maximized Pattern Modal */}
-      <Dialog open={selectedPattern !== null} onOpenChange={(open) => !open && setSelectedPattern(null)}>
+      <Dialog
+        open={selectedPattern !== null}
+        onOpenChange={(open) => !open && setSelectedPattern(null)}
+      >
         <DialogContent className="max-w-3xl bg-background/95 border-border shadow-2xl max-h-[90vh] overflow-y-auto">
           <DialogHeader>
             <DialogTitle className="text-lg font-bold flex items-center gap-2">
@@ -169,11 +183,11 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
               {selectedPattern?.name} Analysis — {symbol}/USDT ({timeframe.toUpperCase()})
             </DialogTitle>
           </DialogHeader>
-          
+
           {selectedPattern && (
             <div className="space-y-4 pt-2">
               <PatternChart candles={candles} pattern={selectedPattern} isFullscreen={true} />
-              
+
               <div className="rounded-xl border border-border/40 bg-card/40 p-4 space-y-3">
                 <p className="text-sm text-foreground leading-relaxed">
                   {selectedPattern.description}
@@ -185,7 +199,10 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                       Target Target
                     </span>
                     <span className="font-bold text-sm text-bull tabular mt-0.5 block">
-                      ${selectedPattern.targetPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      $
+                      {selectedPattern.targetPrice.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
                   <div className="rounded-lg bg-background/55 p-2.5 border border-border/20">
@@ -193,7 +210,10 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                       Invalidation Level
                     </span>
                     <span className="font-bold text-sm text-bear tabular mt-0.5 block">
-                      ${selectedPattern.invalidPrice.toLocaleString(undefined, { minimumFractionDigits: 2 })}
+                      $
+                      {selectedPattern.invalidPrice.toLocaleString(undefined, {
+                        minimumFractionDigits: 2,
+                      })}
                     </span>
                   </div>
                   <div className="rounded-lg bg-background/55 p-2.5 border border-border/20">
@@ -210,11 +230,17 @@ export function PatternDashboard({ patterns, candles, symbol, timeframe }: Patte
                     </span>
                     <span className="font-bold text-sm text-foreground mt-0.5 block">
                       {selectedPattern.volumeStatus === "verified" ? (
-                        <span className="text-green-400">✓ Verified ({selectedPattern.breakoutVolumeRatio}x)</span>
+                        <span className="text-green-400">
+                          ✓ Verified ({selectedPattern.breakoutVolumeRatio}x)
+                        </span>
                       ) : selectedPattern.volumeStatus === "weak" ? (
-                        <span className="text-yellow-400">⚠ Weak ({selectedPattern.breakoutVolumeRatio}x)</span>
+                        <span className="text-yellow-400">
+                          ⚠ Weak ({selectedPattern.breakoutVolumeRatio}x)
+                        </span>
                       ) : (
-                        <span className="text-muted-foreground">Steady ({selectedPattern.breakoutVolumeRatio}x)</span>
+                        <span className="text-muted-foreground">
+                          Steady ({selectedPattern.breakoutVolumeRatio}x)
+                        </span>
                       )}
                     </span>
                   </div>

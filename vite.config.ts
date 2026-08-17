@@ -22,8 +22,9 @@ if (mcp && mcp.configResolved) {
         return Reflect.get(target, prop);
       },
     });
-    
-    const hook = originalConfigResolved as any;
+
+    const hook = originalConfigResolved as unknown as
+      ((this: unknown, cfg: unknown) => void) | { handler: (this: unknown, cfg: unknown) => void };
     if (typeof hook === "function") {
       hook.call(this, patchedConfig);
     } else if (hook && typeof hook.handler === "function") {
