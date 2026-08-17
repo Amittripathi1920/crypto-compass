@@ -4,14 +4,17 @@ import { useMutation } from "@tanstack/react-query";
 import { useState, useMemo, useEffect } from "react";
 import {
   Activity,
-  ChevronDown,
-  ChevronUp,
   Compass,
   KeyRound,
   Loader2,
   Sparkles,
   TriangleAlert,
   Search,
+  Zap,
+  Flame,
+  Layers,
+  ShieldCheck,
+  CheckCircle2,
 } from "lucide-react";
 import {
   COINS,
@@ -22,8 +25,9 @@ import {
   type Timeframe,
 } from "@/lib/coins";
 import type { ExchangeId } from "@/lib/market.server";
-import { analyzeCoin, getPatternAnalysis } from "@/lib/signal.functions";
+import { analyzeCoin, analyzeOteCoin, getPatternAnalysis } from "@/lib/signal.functions";
 import { SignalReport } from "@/components/signal/SignalReport";
+import { OteSignalReport } from "@/components/signal/OteSignalReport";
 import { PatternDashboard } from "@/components/signal/PatternDashboard";
 import { ExchangeStatus } from "@/components/signal/ExchangeStatus";
 import { TradeTrackerCard } from "@/components/tracker/TradeTrackerCard";
@@ -45,6 +49,7 @@ import {
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
 import type { SignalResult } from "@/lib/signal-types";
+import type { OteSignal } from "@/lib/ote-engine/types";
 
 export const Route = createFileRoute("/")({
   head: () => ({
@@ -68,13 +73,16 @@ function Index() {
   const { data: sessionData } = useSession();
   const [authOpen, setAuthOpen] = useState(false);
 
+  // Strategy Mode: "classic" (Engine v1) | "ote" (Institutional OTE v2)
+  const [strategyTab, setStrategyTab] = useState<"classic" | "ote">("classic");
+
   const [symbol, setSymbol] = useState<string>("BTC");
   const [dropdownOpen, setDropdownOpen] = useState(false);
 
   const filteredCoins = useMemo(() => {
     if (!symbol) return COINS;
-    const query = symbol.toUpperCase().trim();
-    return COINS.filter((c) => c.symbol.includes(query) || c.name.toUpperCase().includes(query));
+    const s = symbol.toUpperCase().trim();
+    return COINS.filter((c) => c.symbol.includes(s) || c.name.toUpperCase().includes(s));
   }, [symbol]);
 
   const [timeframe, setTimeframe] = useState<Timeframe>("4h");
@@ -82,14 +90,22 @@ function Index() {
   const [model, setModel] = useState<string>("llama-3.3-70b-versatile");
   const [apiKey, setApiKey] = useState<string>("");
 
-  // Strategy Parameters
+  // Classic Strategy Parameters (Engine v1)
   const [minScore, setMinScore] = useState(60);
   const [minRR, setMinRR] = useState(1.5);
   const [atrMult, setAtrMult] = useState(1.5);
   const [pivotStr, setPivotStr] = useState(4);
 
+  // Institutional OTE Parameters (Engine v2)
+  const [oteMinRR, setOteMinRR] = useState(2.0);
+  const [oteMinGrade, setOteMinGrade] = useState<"B" | "A" | "A+">("B");
+
+  // Bulk scan states
   const [bulkScannedResults, setBulkScannedResults] = useState<
     Record<string, { ok: true; data: SignalResult } | { ok: false; error: string }>
+  >({});
+  const [oteBulkResults, setOteBulkResults] = useState<
+    Record<string, { ok: true; data: OteSignal } | { ok: false; error: string }>
   >({});
   const [bulkScanning, setBulkScanning] = useState(false);
   const [bulkProgress, setBulkProgress] = useState({ current: 0, total: 0, currentSymbol: "" });
@@ -97,8 +113,10 @@ function Index() {
 
   const activeProvider = useMemo(() => providerById(provider), [provider]);
   const analyze = useServerFn(analyzeCoin);
+  const analyzeOte = useServerFn(analyzeOteCoin);
   const fetchPatterns = useServerFn(getPatternAnalysis);
 
+  // Classic Scan All Coins
   const handleScanAll = async () => {
     setBulkScanning(true);
     setBulkScannedResults({});
@@ -135,30 +153,70 @@ function Index() {
         };
       }
       setBulkScannedResults({ ...results });
-
-      // Delay to avoid hitting exchange rate limits
-      await new Promise((resolve) => setTimeout(resolve, 400));
+      await new Promise((resolve) => setTimeout(resolve, 300));
     }
-
     setBulkScanning(false);
+  };
+
+  // OTE Scan All Coins
+  const handleOteScanAll = async () => {
+    setBulkScanning(true);
+    setOteBulkResults({});
+    setExpandedSymbols({});
+    setBulkProgress({ current: 0, total: COINS.length, currentSymbol: "" });
+
+    const results: Record<string, { ok: true; data: OteSignal } | { ok: false; error: string }> = {};
+
+    for (let i = 0; i < COINS.length; i++) {
+      const coin = COINS[i]!;
+      setBulkProgress({ current: i + 1, total: COINS.length, currentSymbol: coin.symbol });
+      try {
+        const res = await analyzeOte({
+          data: {
+            symbol: coin.symbol,
+            timeframe,
+            provider,
+            model,
+            apiKey: activeProvider.needsKey ? apiKey.trim() : undefined,
+            minRR: oteMinRR,
+            minGrade: oteMinGrade,
+          },
+        });
+        results[coin.symbol] = { ok: true, data: res };
+      } catch (err) {
+        results[coin.symbol] = {
+          ok: false,
+          error: err instanceof Error ? err.message : "Scan failed",
+        };
+      }
+      setOteBulkResults({ ...results });
+      await new Promise((resolve) => setTimeout(resolve, 300));
+    }
+    setBulkScanning(false);
+  };
+
+  const handleProviderChange = (p: ProviderId) => {
+    setProvider(p);
+    const next = providerById(p);
+    setModel(next.defaultModel);
+    try {
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem(`cc_api_key_${p}`);
+        setApiKey(saved || "");
+      }
+    } catch {
+      setApiKey("");
+    }
   };
 
   useEffect(() => {
     try {
-      const savedProvider = (localStorage.getItem("cc_prev_provider") as ProviderId) || "groq";
-      if (savedProvider) {
-        setProvider(savedProvider);
-        const savedModel = localStorage.getItem("cc_prev_model");
-        if (savedModel) {
-          setModel(savedModel);
-        } else {
-          setModel(providerById(savedProvider).defaultModel);
-        }
-        const savedKey = localStorage.getItem(`cc_api_key_${savedProvider}`) || "";
-        setApiKey(savedKey);
+      if (typeof window !== "undefined") {
+        const saved = localStorage.getItem(`cc_api_key_${provider}`);
+        if (saved) setApiKey(saved);
       }
     } catch {
-      // Ignore localStorage errors in sandboxes/private browsing
+      // Ignore localStorage errors
     }
   }, []);
 
@@ -169,6 +227,7 @@ function Index() {
     source: string;
   } | null>(null);
 
+  // Classic Mutation
   const mutation = useMutation({
     mutationFn: () =>
       analyze({
@@ -188,6 +247,22 @@ function Index() {
       }),
   });
 
+  // OTE Mutation
+  const oteMutation = useMutation({
+    mutationFn: () =>
+      analyzeOte({
+        data: {
+          symbol,
+          timeframe,
+          provider,
+          model: model || undefined,
+          apiKey: activeProvider.needsKey ? apiKey.trim() : undefined,
+          minRR: oteMinRR,
+          minGrade: oteMinGrade,
+        },
+      }),
+  });
+
   const patternMutation = useMutation({
     mutationFn: () =>
       fetchPatterns({
@@ -200,11 +275,18 @@ function Index() {
 
   const keyMissing = activeProvider.needsKey && !apiKey.trim();
   const errorMessage =
-    mutation.error instanceof Error
-      ? mutation.error.message
-      : mutation.error
-        ? "Analysis failed."
-        : "";
+    strategyTab === "classic"
+      ? mutation.error instanceof Error
+        ? mutation.error.message
+        : mutation.error
+          ? "Analysis failed."
+          : ""
+      : oteMutation.error instanceof Error
+        ? oteMutation.error.message
+        : oteMutation.error
+          ? "OTE Analysis failed."
+          : "";
+
   const [errorHeadline, ...errorDetails] = errorMessage.split("\n");
 
   useEffect(() => {
@@ -222,7 +304,7 @@ function Index() {
     <TradeTrackerProvider>
       <main className="min-h-screen bg-background">
         <div className="terminal-grid border-b border-border">
-          <div className="mx-auto max-w-5xl px-4 py-10">
+          <div className="mx-auto max-w-5xl px-4 py-8">
             <div className="flex items-center justify-between">
               <div className="flex items-center gap-2 text-primary">
                 <Activity className="h-4 w-4" />
@@ -251,18 +333,53 @@ function Index() {
                 )}
               </div>
             </div>
+
             <h1 className="mt-3 text-3xl font-bold leading-tight text-foreground sm:text-4xl">
-              Deterministic confluence setups with structural entry, stop and targets.
+              Professional Crypto Strategy & Execution Engines
             </h1>
             <p className="mt-2 max-w-2xl text-sm text-muted-foreground">
-              Multi-timeframe liquidity sweeps, order blocks, and market structures are calculated
-              deterministically from live exchange data, with AI providing natural-language
-              explanations.
+              Run either the deterministic Confluence Engine v1 or the 4-Pillar Smart Money
+              Institutional OTE Engine v2 across live multi-exchange liquidity data.
             </p>
+
+            {/* Strategy Selection Tab Switcher */}
+            <div className="mt-6 flex flex-wrap gap-2 border-t border-border/40 pt-4">
+              <button
+                type="button"
+                onClick={() => setStrategyTab("classic")}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all border",
+                  strategyTab === "classic"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card/60 text-muted-foreground border-border hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <Sparkles className="h-4 w-4" />
+                <span>Classic Confluence Engine (v1)</span>
+              </button>
+
+              <button
+                type="button"
+                onClick={() => setStrategyTab("ote")}
+                className={cn(
+                  "flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all border",
+                  strategyTab === "ote"
+                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                    : "bg-card/60 text-muted-foreground border-border hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <Flame className="h-4 w-4 text-amber-400" />
+                <span>Institutional OTE Engine (v2 — New Strategy)</span>
+                <span className="rounded bg-amber-400/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-300">
+                  SMC
+                </span>
+              </button>
+            </div>
           </div>
         </div>
 
         <div className="mx-auto max-w-5xl space-y-6 px-4 py-8">
+          {/* Main Controls Card */}
           <section className="rounded-xl border border-border bg-card/60 p-5 shadow-xs">
             <div className="grid gap-4 md:grid-cols-4">
               <div className="space-y-1.5 md:col-span-2 relative">
@@ -318,41 +435,28 @@ function Index() {
                   Primary Timeframe
                 </Label>
                 <Select value={timeframe} onValueChange={(v) => setTimeframe(v as Timeframe)}>
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full bg-background/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
                     {TIMEFRAMES.map((tf) => (
                       <SelectItem key={tf.value} value={tf.value}>
-                        {tf.label}
+                        {tf.label} ({tf.horizon})
                       </SelectItem>
                     ))}
                   </SelectContent>
                 </Select>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   AI Provider
                 </Label>
                 <Select
                   value={provider}
-                  onValueChange={(v) => {
-                    const next = v as ProviderId;
-                    setProvider(next);
-                    const nextModel = providerById(next).defaultModel;
-                    setModel(nextModel);
-                    try {
-                      localStorage.setItem("cc_prev_provider", next);
-                      localStorage.setItem("cc_prev_model", nextModel);
-                      const savedKey = localStorage.getItem(`cc_api_key_${next}`) || "";
-                      setApiKey(savedKey);
-                    } catch {
-                      // ignore localStorage failure
-                    }
-                  }}
+                  onValueChange={(v) => handleProviderChange(v as ProviderId)}
                 >
-                  <SelectTrigger className="w-full">
+                  <SelectTrigger className="w-full bg-background/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -365,22 +469,12 @@ function Index() {
                 </Select>
               </div>
 
-              <div className="space-y-1.5">
+              <div className="space-y-1.5 md:col-span-2">
                 <Label className="text-[10px] uppercase tracking-widest text-muted-foreground">
                   Model
                 </Label>
-                <Select
-                  value={model}
-                  onValueChange={(v) => {
-                    setModel(v);
-                    try {
-                      localStorage.setItem("cc_prev_model", v);
-                    } catch {
-                      // ignore localStorage failure
-                    }
-                  }}
-                >
-                  <SelectTrigger className="w-full">
+                <Select value={model} onValueChange={setModel}>
+                  <SelectTrigger className="w-full bg-background/50">
                     <SelectValue />
                   </SelectTrigger>
                   <SelectContent>
@@ -394,15 +488,13 @@ function Index() {
               </div>
 
               {activeProvider.needsKey || activeProvider.id === "groq" ? (
-                <div className="space-y-1.5 md:col-span-2">
-                  <Label className="flex items-center gap-1.5 text-[10px] uppercase tracking-widest text-muted-foreground">
-                    <KeyRound className="h-3 w-3" /> {activeProvider.label} API key
-                    {activeProvider.id === "groq" && (
-                      <span className="text-[9px] lowercase text-emerald-400 font-normal">
-                        (optional - default key active)
-                      </span>
-                    )}
-                  </Label>
+                <div className="space-y-1.5 md:col-span-4">
+                  <div className="flex items-center justify-between">
+                    <Label className="text-[10px] uppercase tracking-widest text-muted-foreground flex items-center gap-1.5">
+                      <KeyRound className="h-3 w-3" />
+                      {activeProvider.label} API Key {activeProvider.id === "groq" ? "(Optional)" : ""}
+                    </Label>
+                  </div>
                   <Input
                     type="password"
                     value={apiKey}
@@ -410,13 +502,15 @@ function Index() {
                       const val = e.target.value;
                       setApiKey(val);
                       try {
-                        if (val.trim()) {
-                          localStorage.setItem(`cc_api_key_${provider}`, val.trim());
-                        } else {
-                          localStorage.removeItem(`cc_api_key_${provider}`);
+                        if (typeof window !== "undefined") {
+                          if (val.trim()) {
+                            localStorage.setItem(`cc_api_key_${activeProvider.id}`, val.trim());
+                          } else {
+                            localStorage.removeItem(`cc_api_key_${activeProvider.id}`);
+                          }
                         }
                       } catch {
-                        // ignore localStorage failure
+                        // Ignore localStorage errors
                       }
                     }}
                     placeholder={activeProvider.keyHint}
@@ -428,177 +522,266 @@ function Index() {
                       : "💾 Your API key is saved locally in your browser storage for future sessions."}
                   </p>
                 </div>
-              ) : (
-                <p className="text-[10px] text-muted-foreground md:col-span-2">
-                  {activeProvider.keyHint}
-                </p>
-              )}
+              ) : null}
             </div>
 
-            {/* Collapsible Strategy Settings */}
-            <div className="mt-3.5 pt-3.5 border-t border-border/30">
-              <details className="group cursor-pointer select-none">
-                <summary className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold flex items-center gap-1.5 hover:text-foreground transition-colors">
-                  <span>🛠️ Strategy Engine Parameters</span>
-                  <span className="text-[8px] opacity-75 font-normal tracking-normal group-open:hidden">
-                    (Click to Expand)
-                  </span>
-                </summary>
-
-                <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 pt-3.5 mt-2 border-t border-border/20">
-                  <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                    <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                      <span>Min Confluence</span>
-                      <span className="text-foreground font-bold font-mono">{minScore}/100</span>
-                    </div>
-                    <input
-                      type="range"
-                      min="40"
-                      max="85"
-                      step="5"
-                      value={minScore}
-                      onChange={(e) => setMinScore(Number(e.target.value))}
-                      className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                    />
-                    <span className="text-[9px] text-muted-foreground/80 block">
-                      Rejects low-quality setups
+            {/* TAB 1: Classic Strategy Settings */}
+            {strategyTab === "classic" && (
+              <div className="mt-3.5 pt-3.5 border-t border-border/30">
+                <details className="group cursor-pointer select-none">
+                  <summary className="text-[10px] uppercase tracking-widest text-muted-foreground font-bold flex items-center gap-1.5 hover:text-foreground transition-colors">
+                    <span>🛠️ Classic Strategy Parameters</span>
+                    <span className="text-[8px] opacity-75 font-normal tracking-normal group-open:hidden">
+                      (Click to Expand)
                     </span>
-                  </div>
+                  </summary>
 
-                  <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
+                  <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 pt-3.5 mt-2 border-t border-border/20">
+                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
+                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                        <span>Min Confluence</span>
+                        <span className="text-foreground font-bold font-mono">{minScore}/100</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="40"
+                        max="85"
+                        step="5"
+                        value={minScore}
+                        onChange={(e) => setMinScore(Number(e.target.value))}
+                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
+                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                        <span>Min R:R Ratio</span>
+                        <span className="text-foreground font-bold font-mono">
+                          {minRR.toFixed(1)}R
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="1.0"
+                        max="3.0"
+                        step="0.25"
+                        value={minRR}
+                        onChange={(e) => setMinRR(Number(e.target.value))}
+                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
+                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                        <span>ATR Buffer</span>
+                        <span className="text-foreground font-bold font-mono">
+                          {atrMult.toFixed(1)}x
+                        </span>
+                      </div>
+                      <input
+                        type="range"
+                        min="0.5"
+                        max="3.0"
+                        step="0.25"
+                        value={atrMult}
+                        onChange={(e) => setAtrMult(Number(e.target.value))}
+                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                      />
+                    </div>
+
+                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
+                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                        <span>Pivot Strength</span>
+                        <span className="text-foreground font-bold font-mono">{pivotStr} bars</span>
+                      </div>
+                      <input
+                        type="range"
+                        min="2"
+                        max="7"
+                        step="1"
+                        value={pivotStr}
+                        onChange={(e) => setPivotStr(Number(e.target.value))}
+                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                      />
+                    </div>
+                  </div>
+                </details>
+
+                <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                  <Button
+                    className="flex-grow font-semibold"
+                    size="lg"
+                    disabled={mutation.isPending || keyMissing || bulkScanning}
+                    onClick={() => {
+                      patternMutation.reset();
+                      setBulkScannedResults({});
+                      mutation.mutate();
+                    }}
+                  >
+                    {mutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing Confluence...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" /> Generate Trade Setup (v1)
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="outline"
+                    className="flex-grow border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground"
+                    size="lg"
+                    disabled={patternMutation.isPending || bulkScanning}
+                    onClick={() => {
+                      mutation.reset();
+                      setBulkScannedResults({});
+                      patternMutation.mutate();
+                    }}
+                  >
+                    {patternMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning Patterns...
+                      </>
+                    ) : (
+                      <>
+                        <Compass className="mr-2 h-4 w-4" /> Pattern/Analysis
+                      </>
+                    )}
+                  </Button>
+                  <Button
+                    variant="default"
+                    className="flex-grow bg-bull/90 hover:bg-bull text-white font-bold"
+                    size="lg"
+                    disabled={
+                      mutation.isPending || patternMutation.isPending || bulkScanning || keyMissing
+                    }
+                    onClick={handleScanAll}
+                  >
+                    {bulkScanning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning (
+                        {bulkProgress.current}/{bulkProgress.total})...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4" /> Scan All Coins
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
+
+            {/* TAB 2: Institutional OTE Strategy Settings */}
+            {strategyTab === "ote" && (
+              <div className="mt-3.5 pt-3.5 border-t border-border/30">
+                <div className="rounded-lg border border-amber-500/30 bg-amber-500/5 p-3.5 mb-3">
+                  <div className="flex items-center gap-2 text-amber-400 font-bold text-xs uppercase tracking-wider">
+                    <Flame className="h-4 w-4" /> 4-Pillar Smart Money OTE Methodology
+                  </div>
+                  <p className="text-[11px] text-muted-foreground mt-1">
+                    Strict institutional trade cycle: 1. HTF Macro Bias & Liquidity Map $\to$ 2.
+                    Liquidity Purge (PDH/PDL Sweep) $\to$ 3. Institutional Displacement (MSS & FVG)
+                    $\to$ 4. Retest of 61.8%–78.6% OTE Golden Zone.
+                  </p>
+                </div>
+
+                <div className="grid gap-3 sm:grid-cols-2 pt-2">
+                  <div className="space-y-1 bg-background/40 p-3 rounded-lg border border-border/40">
                     <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                      <span>Min R:R Ratio</span>
+                      <span>Minimum Required R:R</span>
                       <span className="text-foreground font-bold font-mono">
-                        {minRR.toFixed(1)}R
+                        {oteMinRR.toFixed(1)}R
                       </span>
                     </div>
                     <input
                       type="range"
-                      min="1.0"
-                      max="3.0"
+                      min="1.5"
+                      max="4.0"
                       step="0.25"
-                      value={minRR}
-                      onChange={(e) => setMinRR(Number(e.target.value))}
+                      value={oteMinRR}
+                      onChange={(e) => setOteMinRR(Number(e.target.value))}
                       className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
                     />
                     <span className="text-[9px] text-muted-foreground/80 block">
-                      Minimum required target 2 return
+                      Rejects trades without at least {oteMinRR}R to opposing liquidity
                     </span>
                   </div>
 
-                  <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
+                  <div className="space-y-1 bg-background/40 p-3 rounded-lg border border-border/40">
                     <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                      <span>ATR Buffer</span>
+                      <span>Minimum Setup Grade</span>
                       <span className="text-foreground font-bold font-mono">
-                        {atrMult.toFixed(1)}x
+                        Grade {oteMinGrade}
                       </span>
                     </div>
-                    <input
-                      type="range"
-                      min="0.5"
-                      max="3.0"
-                      step="0.25"
-                      value={atrMult}
-                      onChange={(e) => setAtrMult(Number(e.target.value))}
-                      className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                    />
-                    <span className="text-[9px] text-muted-foreground/80 block">
-                      Stop-loss structural buffer
-                    </span>
-                  </div>
-
-                  <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                    <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                      <span>Pivot Strength</span>
-                      <span className="text-foreground font-bold font-mono">{pivotStr} bars</span>
+                    <div className="grid grid-cols-3 gap-2 mt-1">
+                      {(["B", "A", "A+"] as const).map((grade) => (
+                        <button
+                          key={grade}
+                          type="button"
+                          onClick={() => setOteMinGrade(grade)}
+                          className={cn(
+                            "rounded py-1 text-xs font-bold border transition-colors",
+                            oteMinGrade === grade
+                              ? "bg-primary text-primary-foreground border-primary"
+                              : "bg-background/60 text-muted-foreground border-border hover:bg-accent",
+                          )}
+                        >
+                          Grade {grade}
+                        </button>
+                      ))}
                     </div>
-                    <input
-                      type="range"
-                      min="2"
-                      max="7"
-                      step="1"
-                      value={pivotStr}
-                      onChange={(e) => setPivotStr(Number(e.target.value))}
-                      className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                    />
-                    <span className="text-[9px] text-muted-foreground/80 block">
-                      Swing detection sensitivity
-                    </span>
                   </div>
                 </div>
-              </details>
-            </div>
 
-            <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-border/40">
-              <Button
-                className="flex-grow font-semibold"
-                size="lg"
-                disabled={mutation.isPending || keyMissing || bulkScanning}
-                onClick={() => {
-                  patternMutation.reset();
-                  setBulkScannedResults({});
-                  mutation.mutate();
-                }}
-              >
-                {mutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Analyzing Confluence...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" /> Generate Trade Setup
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="outline"
-                className="flex-grow border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground"
-                size="lg"
-                disabled={patternMutation.isPending || bulkScanning}
-                onClick={() => {
-                  mutation.reset();
-                  setBulkScannedResults({});
-                  patternMutation.mutate();
-                }}
-              >
-                {patternMutation.isPending ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning Patterns...
-                  </>
-                ) : (
-                  <>
-                    <Compass className="mr-2 h-4 w-4" /> Pattern/Analysis
-                  </>
-                )}
-              </Button>
-              <Button
-                variant="default"
-                className="flex-grow bg-bull/90 hover:bg-bull text-white font-bold"
-                size="lg"
-                disabled={
-                  mutation.isPending || patternMutation.isPending || bulkScanning || keyMissing
-                }
-                onClick={handleScanAll}
-              >
-                {bulkScanning ? (
-                  <>
-                    <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning (
-                    {bulkProgress.current}/{bulkProgress.total})...
-                  </>
-                ) : (
-                  <>
-                    <Sparkles className="mr-2 h-4 w-4" /> Scan All Coins
-                  </>
-                )}
-              </Button>
-            </div>
-            {keyMissing ? (
-              <p className="mt-2 text-center text-[11px] text-muted-foreground">
-                Enter an API key, or switch back to the built-in Lovable AI.
-              </p>
-            ) : null}
+                <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-border/40">
+                  <Button
+                    className="flex-grow font-bold bg-amber-500 hover:bg-amber-600 text-black"
+                    size="lg"
+                    disabled={oteMutation.isPending || keyMissing || bulkScanning}
+                    onClick={() => {
+                      setOteBulkResults({});
+                      oteMutation.mutate();
+                    }}
+                  >
+                    {oteMutation.isPending ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin text-black" /> Analyzing
+                        Institutional OTE...
+                      </>
+                    ) : (
+                      <>
+                        <Flame className="mr-2 h-4 w-4 text-black" /> Generate OTE Setup (v2)
+                      </>
+                    )}
+                  </Button>
+
+                  <Button
+                    variant="outline"
+                    className="flex-grow border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold"
+                    size="lg"
+                    disabled={oteMutation.isPending || bulkScanning || keyMissing}
+                    onClick={handleOteScanAll}
+                  >
+                    {bulkScanning ? (
+                      <>
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" /> Scanning (
+                        {bulkProgress.current}/{bulkProgress.total})...
+                      </>
+                    ) : (
+                      <>
+                        <Sparkles className="mr-2 h-4 w-4 text-amber-400" /> OTE Scan All Coins
+                      </>
+                    )}
+                  </Button>
+                </div>
+              </div>
+            )}
           </section>
 
+          {/* Error Display */}
           {errorMessage ? (
             <div className="space-y-3 rounded-xl border border-destructive/40 bg-destructive/10 p-4">
               <div className="flex items-start gap-2">
@@ -623,19 +806,11 @@ function Index() {
                   </pre>
                 </div>
               ) : null}
-
-              <ExchangeStatus
-                attempts={errorDetails.flatMap((linked) => {
-                  const m = /^(OKX|Binance|Kraken) \((\d+)ms\): (.*)$/.exec(linked.trim());
-                  return m
-                    ? [{ exchange: m[1] as ExchangeId, ok: false, ms: Number(m[2]), error: m[3]! }]
-                    : [];
-                })}
-              />
             </div>
           ) : null}
 
-          {mutation.isPending ? (
+          {/* Loading Skeletons */}
+          {(mutation.isPending || oteMutation.isPending) && (
             <div className="space-y-3">
               <Skeleton className="h-40 w-full rounded-xl" />
               <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -645,241 +820,141 @@ function Index() {
               </div>
               <Skeleton className="h-64 w-full rounded-xl" />
             </div>
-          ) : null}
+          )}
 
-          {mutation.data && !mutation.isPending ? <SignalReport result={mutation.data} /> : null}
+          {/* TAB 1: Classic Report Display */}
+          {strategyTab === "classic" && mutation.data && !mutation.isPending && (
+            <SignalReport result={mutation.data} />
+          )}
 
-          {patternMutation.isPending ? (
-            <div className="space-y-3">
-              <Skeleton className="h-40 w-full rounded-xl" />
-              <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                {[0, 1, 2, 3].map((i) => (
-                  <Skeleton key={i} className="h-20 rounded-lg" />
-                ))}
-              </div>
-            </div>
-          ) : null}
+          {/* TAB 2: Institutional OTE Report Display */}
+          {strategyTab === "ote" && oteMutation.data && !oteMutation.isPending && (
+            <OteSignalReport result={oteMutation.data} />
+          )}
 
-          {patternMutation.data && !patternMutation.isPending ? (
+          {/* Pattern Dashboard */}
+          {patternMutation.data && !patternMutation.isPending && (
             <PatternDashboard
-              patterns={patternMutation.data.patterns}
-              candles={patternMutation.data.candles}
               symbol={symbol}
               timeframe={timeframe}
+              patterns={patternMutation.data.patterns}
+              candles={patternMutation.data.candles}
             />
-          ) : null}
+          )}
 
-          {/* Bulk Scanning Progress and List */}
-          {bulkScanning || Object.keys(bulkScannedResults).length > 0 ? (
+          {/* Bulk Results Table for Classic */}
+          {strategyTab === "classic" && Object.keys(bulkScannedResults).length > 0 && (
             <section className="rounded-xl border border-border bg-card/60 p-5 space-y-4">
-              <div className="flex items-center justify-between border-b border-border/40 pb-3">
-                <div>
-                  <h2 className="text-sm font-bold tracking-wider text-foreground uppercase">
-                    Bulk Confluence Scan Results (
-                    {TIMEFRAMES.find((t) => t.value === timeframe)?.label || timeframe})
-                  </h2>
-                  <p className="text-[10px] text-muted-foreground">
-                    Sequential confluence analysis of supported exchange-traded tokens
-                  </p>
-                </div>
-                {bulkScanning && (
-                  <div className="flex items-center gap-2 text-[10px] font-bold text-primary uppercase tracking-wider">
-                    <Loader2 className="h-3 w-3 animate-spin" />
-                    <span>
-                      Scanning {bulkProgress.currentSymbol} ({bulkProgress.current}/
-                      {bulkProgress.total})
-                    </span>
-                  </div>
-                )}
-              </div>
-
-              {/* Progress bar */}
-              {bulkScanning && (
-                <div className="w-full bg-muted/30 rounded-full h-1 overflow-hidden">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-foreground">
+                All Coins Scan Results ({timeframe.toUpperCase()})
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                {Object.entries(bulkScannedResults).map(([sym, res]) => (
                   <div
-                    className="bg-primary h-1 transition-all duration-300 rounded-full"
-                    style={{ width: `${(bulkProgress.current / bulkProgress.total) * 100}%` }}
-                  ></div>
-                </div>
-              )}
-
-              {/* Accordion List */}
-              <div className="space-y-2">
-                {COINS.map((coin) => {
-                  const resultObj = bulkScannedResults[coin.symbol];
-                  const isExpanded = !!expandedSymbols[coin.symbol];
-
-                  return (
-                    <div
-                      key={coin.symbol}
-                      className={cn(
-                        "rounded-lg border bg-background/20 transition-all",
-                        isExpanded
-                          ? "border-primary/30 shadow-md bg-background/35"
-                          : "border-border/40 hover:border-border/70",
-                      )}
-                    >
-                      {/* Accordion Summary Row */}
-                      <div
-                        className="flex flex-wrap items-center justify-between gap-3 px-4 py-2.5 cursor-pointer select-none hover:bg-muted/10 text-xs"
-                        onClick={() => {
-                          if (resultObj) {
-                            setExpandedSymbols({
-                              ...expandedSymbols,
-                              [coin.symbol]: !isExpanded,
-                            });
-                          }
-                        }}
-                      >
-                        <div className="flex items-center gap-2 min-w-[130px]">
-                          <span className="font-bold text-xs tracking-wider text-foreground">
-                            {coin.symbol}
-                          </span>
-                          <span className="text-[10px] text-muted-foreground truncate max-w-[90px]">
-                            {coin.name}
-                          </span>
-                        </div>
-
-                        {/* Result Content */}
-                        {resultObj ? (
-                          resultObj.ok ? (
-                            <>
-                              {/* Direction */}
-                              <div className="min-w-[80px]">
-                                {resultObj.data.direction === "LONG" ? (
-                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-bull/10 text-bull border border-bull/20 uppercase tracking-wide">
-                                    ▲ LONG
-                                  </span>
-                                ) : resultObj.data.direction === "SHORT" ? (
-                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-bear/10 text-bear border border-bear/20 uppercase tracking-wide">
-                                    ▼ SHORT
-                                  </span>
-                                ) : (
-                                  <span className="inline-flex items-center gap-0.5 rounded px-1.5 py-0.5 text-[9px] font-bold bg-muted/20 text-muted-foreground border border-border/30 uppercase tracking-wide">
-                                    ■ NO TRADE
-                                  </span>
-                                )}
-                              </div>
-
-                              {/* Price Levels (Entry / Stop / Targets) */}
-                              {resultObj.data.direction !== "NO TRADE" ? (
-                                <div className="hidden md:flex items-center gap-4 text-[10px] font-mono">
-                                  <div>
-                                    <span className="text-muted-foreground mr-1 text-[9px] uppercase">
-                                      Entry:
-                                    </span>
-                                    <span className="font-semibold text-foreground">
-                                      ${fmtPrice(resultObj.data.entry)}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground mr-1 text-[9px] uppercase">
-                                      Stop:
-                                    </span>
-                                    <span className="font-semibold text-bear">
-                                      ${fmtPrice(resultObj.data.stopLoss)}
-                                    </span>
-                                  </div>
-                                  <div>
-                                    <span className="text-muted-foreground mr-1 text-[9px] uppercase">
-                                      Target 1:
-                                    </span>
-                                    <span className="font-semibold text-bull">
-                                      ${fmtPrice(resultObj.data.target1)}
-                                    </span>
-                                  </div>
-                                </div>
-                              ) : (
-                                <div className="hidden md:block text-[9px] text-muted-foreground truncate max-w-[220px]">
-                                  {resultObj.data.summary || "No active setup triggered."}
-                                </div>
-                              )}
-
-                              {/* Score and RR */}
-                              <div className="flex items-center gap-4 ml-auto sm:ml-0">
-                                {resultObj.data.direction !== "NO TRADE" && (
-                                  <div className="hidden xs:block text-right">
-                                    <p className="text-[8px] uppercase tracking-wider text-muted-foreground">
-                                      R:R
-                                    </p>
-                                    <p className="text-[10px] font-bold font-mono text-foreground">
-                                      {resultObj.data.riskReward.toFixed(1)}x
-                                    </p>
-                                  </div>
-                                )}
-
-                                <div className="text-right min-w-[65px]">
-                                  <p className="text-[8px] uppercase tracking-wider text-muted-foreground">
-                                    Confluence
-                                  </p>
-                                  <p
-                                    className={cn(
-                                      "text-[10px] font-bold font-mono",
-                                      resultObj.data.confluenceScore >= 75
-                                        ? "text-bull"
-                                        : resultObj.data.confluenceScore >= 60
-                                          ? "text-primary"
-                                          : "text-muted-foreground",
-                                    )}
-                                  >
-                                    {resultObj.data.confluenceScore}/100
-                                  </p>
-                                </div>
-
-                                <span className="text-muted-foreground/60">
-                                  {isExpanded ? (
-                                    <ChevronUp className="h-3.5 w-3.5" />
-                                  ) : (
-                                    <ChevronDown className="h-3.5 w-3.5" />
-                                  )}
-                                </span>
-                              </div>
-                            </>
-                          ) : (
-                            <div className="flex-1 flex items-center justify-between text-[10px] text-bear">
-                              <span>⚠️ Error: {resultObj.error}</span>
-                              <span className="text-[9px] uppercase font-bold bg-bear/5 px-1.5 py-0.5 rounded border border-bear/20">
-                                Failed
-                              </span>
-                            </div>
-                          )
-                        ) : (
-                          <div className="flex items-center gap-2 text-[10px] text-muted-foreground italic">
-                            {bulkScanning && bulkProgress.currentSymbol === coin.symbol ? (
-                              <>
-                                <Loader2 className="h-2.5 w-2.5 animate-spin text-primary" />
-                                <span>Scanning live candles...</span>
-                              </>
-                            ) : (
-                              <span>Pending scan...</span>
-                            )}
-                          </div>
-                        )}
-                      </div>
-
-                      {/* Accordion Content (Full Signal Report when expanded) */}
-                      {isExpanded && resultObj?.ok && (
-                        <div className="border-t border-border/30 bg-background/5 p-4">
-                          <SignalReport result={resultObj.data} />
-                        </div>
+                    key={sym}
+                    className="p-3 rounded-lg border border-border/40 bg-background/50 flex items-center justify-between"
+                  >
+                    <div>
+                      <span className="font-bold text-sm text-foreground">{sym}</span>
+                      {res.ok ? (
+                        <span
+                          className={cn(
+                            "block text-xs font-semibold",
+                            res.data.direction === "LONG"
+                              ? "text-bull"
+                              : res.data.direction === "SHORT"
+                                ? "text-bear"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {res.data.direction} ({res.data.confluenceScore}/100)
+                        </span>
+                      ) : (
+                        <span className="block text-xs text-bear">Failed</span>
                       )}
                     </div>
-                  );
-                })}
+                    {res.ok && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSymbol(sym);
+                          mutation.mutate();
+                        }}
+                        className="text-xs h-7"
+                      >
+                        View
+                      </Button>
+                    )}
+                  </div>
+                ))}
               </div>
             </section>
-          ) : null}
+          )}
 
+          {/* Bulk Results Table for OTE */}
+          {strategyTab === "ote" && Object.keys(oteBulkResults).length > 0 && (
+            <section className="rounded-xl border border-border bg-card/60 p-5 space-y-4">
+              <h3 className="text-sm font-bold uppercase tracking-wider text-foreground flex items-center gap-2">
+                <Flame className="h-4 w-4 text-amber-400" /> All Coins Institutional OTE Scans (
+                {timeframe.toUpperCase()})
+              </h3>
+              <div className="grid gap-2 sm:grid-cols-2 md:grid-cols-3">
+                {Object.entries(oteBulkResults).map(([sym, res]) => (
+                  <div
+                    key={sym}
+                    className="p-3 rounded-lg border border-border/40 bg-background/50 flex items-center justify-between"
+                  >
+                    <div>
+                      <div className="flex items-center gap-1.5">
+                        <span className="font-bold text-sm text-foreground">{sym}</span>
+                        {res.ok && res.data.setupGrade !== "NO_SETUP" && (
+                          <span className="text-[9px] font-black px-1.5 rounded bg-amber-400/20 text-amber-300">
+                            {res.data.setupGrade}
+                          </span>
+                        )}
+                      </div>
+                      {res.ok ? (
+                        <span
+                          className={cn(
+                            "block text-xs font-semibold",
+                            res.data.direction === "LONG"
+                              ? "text-bull"
+                              : res.data.direction === "SHORT"
+                                ? "text-bear"
+                                : "text-muted-foreground",
+                          )}
+                        >
+                          {res.data.direction} (Quality: {res.data.qualityScore}/100)
+                        </span>
+                      ) : (
+                        <span className="block text-xs text-bear">Failed</span>
+                      )}
+                    </div>
+                    {res.ok && (
+                      <Button
+                        size="sm"
+                        variant="ghost"
+                        onClick={() => {
+                          setSymbol(sym);
+                          oteMutation.mutate();
+                        }}
+                        className="text-xs h-7"
+                      >
+                        View OTE
+                      </Button>
+                    )}
+                  </div>
+                ))}
+              </div>
+            </section>
+          )}
+
+          {/* Active Tracked Trades Card */}
           <TradeTrackerCard />
-
-          <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
-
-          <p className="border-t border-border pt-4 text-[11px] leading-relaxed text-muted-foreground">
-            This tool is for research and education only and is not financial advice. Crypto markets
-            are volatile and leveraged trading can lose more than your deposit. Always size
-            positions to your own risk tolerance and verify levels on your own chart before trading.
-          </p>
         </div>
+
+        <AuthDialog open={authOpen} onOpenChange={setAuthOpen} />
       </main>
     </TradeTrackerProvider>
   );

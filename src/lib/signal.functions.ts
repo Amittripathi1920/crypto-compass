@@ -38,6 +38,25 @@ export const analyzeCoin = createServerFn({ method: "POST" })
     return generateSignal(data as SignalRequest);
   });
 
+export const analyzeOteCoin = createServerFn({ method: "POST" })
+  .inputValidator((input: unknown) =>
+    z
+      .object({
+        symbol: z.string().min(2).max(10),
+        timeframe: z.enum(["5m", "15m", "1h", "4h", "8h", "1d", "1w"]),
+        provider: z.enum(["lovable", "openai", "anthropic", "google", "groq"]),
+        model: z.string().max(80).optional(),
+        apiKey: z.string().max(300).optional(),
+        minRR: z.number().min(1.0).max(10).optional(),
+        minGrade: z.enum(["B", "A", "A+"]).optional(),
+      })
+      .parse(input),
+  )
+  .handler(async ({ data }) => {
+    const { generateOteSignal } = await import("./ote-engine/ote.server");
+    return generateOteSignal(data as any);
+  });
+
 export const getLivePrice = createServerFn({ method: "POST" })
   .inputValidator((input: unknown) =>
     z
