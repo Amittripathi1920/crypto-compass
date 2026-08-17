@@ -1,6 +1,12 @@
 import type { Candle } from "./indicators";
 import type { ProviderId, Timeframe } from "./coins";
-import type { MarketRegime, EngineConfig } from "./engine/types";
+import type {
+  MarketRegime,
+  EngineConfig,
+  EntryType,
+  EntryZone,
+  RejectionReasonHierarchy,
+} from "./engine/types";
 import type { ExchangeId, ExchangeAttempt } from "./market.server";
 
 export type SignalRequest = {
@@ -35,6 +41,10 @@ export type SignalResult = {
   directionalEdge: number;
   longScore: number;
   shortScore: number;
+  entryType?: EntryType | undefined;
+  entryZone?: EntryZone | undefined;
+  triggerCondition?: string | undefined;
+  expirationCandles?: number | undefined;
   entry: number;
   stopLoss: number;
   target1: number;
@@ -44,6 +54,7 @@ export type SignalResult = {
   summary: string;
   reasoning: { label: string; detail: string }[];
   rejectionReasons: string[];
+  rejectionHierarchy?: RejectionReasonHierarchy | undefined;
   invalidation: string;
   setupType?: string[] | undefined;
   indicators: {

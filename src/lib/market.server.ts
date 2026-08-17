@@ -26,11 +26,43 @@ export type Sourced<T> = {
 };
 
 export type MultiTimeframeMarketData = {
-  candles: Record<Timeframe, Candle[]>;
+  candles: Record<string, Candle[]>;
   ticker: Ticker;
   source: ExchangeId;
   attempts: ExchangeAttempt[];
 };
+
+const TIMEFRAME_MS: Record<Timeframe, number> = {
+  "5m": 5 * 60 * 1000,
+  "15m": 15 * 60 * 1000,
+  "1h": 60 * 60 * 1000,
+  "4h": 4 * 60 * 60 * 1000,
+  "8h": 8 * 60 * 60 * 1000,
+  "1d": 24 * 60 * 60 * 1000,
+  "1w": 7 * 24 * 60 * 60 * 1000,
+};
+
+/* ---------------- In-Memory Market Data Cache ---------------- */
+type CacheEntry<T> = {
+  data: T;
+  expiresAt: number;
+};
+
+const cache = new Map<string, CacheEntry<unknown>>();
+
+function getCached<T>(key: string): T | null {
+  const entry = cache.get(key);
+  if (!entry) return null;
+  if (Date.now() > entry.expiresAt) {
+    cache.delete(key);
+    return null;
+  }
+  return entry.data as T;
+}
+
+function setCached<T>(key: string, data: T, ttlMs: number): void {
+  cache.set(key, { data, expiresAt: Date.now() + ttlMs });
+}
 
 async function getJson(url: string): Promise<unknown> {
   const res = await fetch(url, { headers: { accept: "application/json" } });
@@ -41,9 +73,14 @@ async function getJson(url: string): Promise<unknown> {
 const num = (v: unknown) => Number(v);
 
 /**
- * Normalizes candle stream: validates numbers, cleans NaNs, dedupes, sorts ascending by timestamp
+ * Normalizes candle stream: validates numbers, cleans NaNs, dedupes, sorts ascending by timestamp,
+ * and drops unclosed forming candles when closedOnly is true.
  */
-export function normalizeCandles(raw: Candle[], timeframe?: Timeframe): NormalizedCandle[] {
+export function normalizeCandles(
+  raw: Candle[],
+  timeframe?: Timeframe,
+  closedOnly = true,
+): NormalizedCandle[] {
   if (!Array.isArray(raw) || raw.length === 0) return [];
 
   // Filter valid numbers
@@ -88,7 +125,51 @@ export function normalizeCandles(raw: Candle[], timeframe?: Timeframe): Normaliz
     }
   }
 
+  // Drop unclosed forming candle if closedOnly is enforced
+  if (closedOnly && timeframe && deduped.length > 0) {
+    const intervalMs = TIMEFRAME_MS[timeframe] || 60000;
+    const last = deduped[deduped.length - 1]!;
+    const isUnclosed = Date.now() < last.time + intervalMs;
+    if (isUnclosed && deduped.length > 1) {
+      deduped.pop();
+    }
+  }
+
   return deduped;
+}
+
+/**
+ * Synthesizes higher timeframe candles from smaller base candles with strict boundary alignment.
+ */
+export function aggregateCandles(candles: Candle[], intervalMs: number): Candle[] {
+  if (candles.length === 0) return [];
+
+  const buckets = new Map<number, Candle[]>();
+  for (const c of candles) {
+    const bucketTime = Math.floor(c.time / intervalMs) * intervalMs;
+    const list = buckets.get(bucketTime) || [];
+    list.push(c);
+    buckets.set(bucketTime, list);
+  }
+
+  const aggregated: Candle[] = [];
+  const sortedTimes = Array.from(buckets.keys()).sort((a, b) => a - b);
+
+  for (const t of sortedTimes) {
+    const group = buckets.get(t)!;
+    if (group.length === 0) continue;
+    group.sort((a, b) => a.time - b.time);
+    aggregated.push({
+      time: t,
+      open: group[0]!.open,
+      high: Math.max(...group.map((c) => c.high)),
+      low: Math.min(...group.map((c) => c.low)),
+      close: group[group.length - 1]!.close,
+      volume: group.reduce((sum, c) => sum + c.volume, 0),
+    });
+  }
+
+  return aggregated;
 }
 
 /* ---------------- Binance ---------------- */
@@ -122,7 +203,7 @@ async function binanceCandles(symbol: string, tf: Timeframe): Promise<Candle[]> 
       volume: num(k[5]),
     };
   });
-  return normalizeCandles(candles, tf);
+  return normalizeCandles(candles, tf, true);
 }
 
 async function binanceTicker(symbol: string): Promise<Ticker> {
@@ -163,7 +244,7 @@ async function okxCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
       volume: num(k[5]),
     }))
     .reverse();
-  return normalizeCandles(candles, tf);
+  return normalizeCandles(candles, tf, true);
 }
 
 async function okxTicker(symbol: string): Promise<Ticker> {
@@ -211,7 +292,7 @@ async function krakenCandles(symbol: string, tf: Timeframe): Promise<Candle[]> {
     close: num(k[4]),
     volume: num(k[6]),
   }));
-  return normalizeCandles(candles, tf);
+  return normalizeCandles(candles, tf, true);
 }
 
 function tickerFromCandles(candles: Candle[]): Ticker {
@@ -231,14 +312,16 @@ function tickerFromCandles(candles: Candle[]): Ticker {
 
 /**
  * Fetches all requested timeframes and ticker from ONE single exchange consistently.
- * If Binance succeeds, 100% of timeframes come from Binance.
- * If Binance fails, falls back to OKX for ALL timeframes.
- * If OKX fails, falls back to Kraken for ALL timeframes.
+ * Utilizes in-memory caching to optimize throughput and rate limits.
  */
 export async function fetchConsistentMarketData(
   symbol: string,
   timeframes: Timeframe[] = ["1d", "4h", "1h", "15m", "5m"],
 ): Promise<MultiTimeframeMarketData> {
+  const cacheKey = `market:${symbol}:${timeframes.sort().join(",")}`;
+  const cached = getCached<MultiTimeframeMarketData>(cacheKey);
+  if (cached) return cached;
+
   const attempts: ExchangeAttempt[] = [];
 
   const exchanges: Array<{
@@ -266,16 +349,25 @@ export async function fetchConsistentMarketData(
   for (const ex of exchanges) {
     const started = Date.now();
     try {
-      // Fetch all timeframes and ticker concurrently on this single exchange
       const tfPromises = timeframes.map(async (tf) => {
         const c = await ex.fetchTf(tf);
         return { tf, candles: c };
       });
       const [tfResults, ticker] = await Promise.all([Promise.all(tfPromises), ex.fetchTick()]);
 
-      const candleMap = {} as Record<Timeframe, Candle[]>;
+      const candleMap = {} as Record<string, Candle[]>;
       for (const res of tfResults) {
         candleMap[res.tf] = res.candles;
+      }
+
+      // Synthesize 8H if needed and not fetched natively
+      if (timeframes.includes("8h") && !candleMap["8h"] && candleMap["4h"]) {
+        candleMap["8h"] = aggregateCandles(candleMap["4h"], 8 * 60 * 60 * 1000);
+      }
+
+      // Synthesize 1W if needed and not fetched natively
+      if (timeframes.includes("1w") && !candleMap["1w"] && candleMap["1d"]) {
+        candleMap["1w"] = aggregateCandles(candleMap["1d"], 7 * 24 * 60 * 60 * 1000);
       }
 
       attempts.push({
@@ -284,12 +376,15 @@ export async function fetchConsistentMarketData(
         ms: Date.now() - started,
       });
 
-      return {
+      const result: MultiTimeframeMarketData = {
         candles: candleMap,
         ticker,
         source: ex.exchange,
         attempts,
       };
+
+      setCached(cacheKey, result, 20_000); // 20s TTL
+      return result;
     } catch (err) {
       attempts.push({
         exchange: ex.exchange,
@@ -314,6 +409,10 @@ export async function fetchCandles(
   symbol: string,
   interval: Timeframe,
 ): Promise<Sourced<Candle[]>> {
+  const cacheKey = `candles:${symbol}:${interval}`;
+  const cached = getCached<Sourced<Candle[]>>(cacheKey);
+  if (cached) return cached;
+
   const attempts: ExchangeAttempt[] = [];
   const tasks: Array<{ exchange: ExchangeId; run: () => Promise<Candle[]> }> = [
     { exchange: "Binance", run: () => binanceCandles(symbol, interval) },
@@ -326,7 +425,9 @@ export async function fetchCandles(
     try {
       const value = await task.run();
       attempts.push({ exchange: task.exchange, ok: true, ms: Date.now() - started });
-      return { value, source: task.exchange, attempts };
+      const result = { value, source: task.exchange, attempts };
+      setCached(cacheKey, result, 20_000);
+      return result;
     } catch (err) {
       attempts.push({
         exchange: task.exchange,
@@ -345,6 +446,10 @@ export async function fetchCandles(
 }
 
 export async function fetchTicker(symbol: string): Promise<Sourced<Ticker>> {
+  const cacheKey = `ticker:${symbol}`;
+  const cached = getCached<Sourced<Ticker>>(cacheKey);
+  if (cached) return cached;
+
   const attempts: ExchangeAttempt[] = [];
   const tasks: Array<{ exchange: ExchangeId; run: () => Promise<Ticker> }> = [
     { exchange: "Binance", run: () => binanceTicker(symbol) },
@@ -357,7 +462,9 @@ export async function fetchTicker(symbol: string): Promise<Sourced<Ticker>> {
     try {
       const value = await task.run();
       attempts.push({ exchange: task.exchange, ok: true, ms: Date.now() - started });
-      return { value, source: task.exchange, attempts };
+      const result = { value, source: task.exchange, attempts };
+      setCached(cacheKey, result, 8_000);
+      return result;
     } catch (err) {
       attempts.push({
         exchange: task.exchange,
@@ -381,6 +488,10 @@ export type SentimentData = {
 };
 
 export async function fetchFearAndGreed(): Promise<SentimentData | null> {
+  const cacheKey = "fng:sentiment";
+  const cached = getCached<SentimentData>(cacheKey);
+  if (cached) return cached;
+
   try {
     const res = await fetch("https://api.alternative.me/fng/?limit=1", {
       signal: AbortSignal.timeout(3000),
@@ -391,10 +502,12 @@ export async function fetchFearAndGreed(): Promise<SentimentData | null> {
     };
     const first = json.data?.[0];
     if (!first) return null;
-    return {
+    const result = {
       value: Number(first.value),
       sentiment: first.value_classification,
     };
+    setCached(cacheKey, result, 10 * 60 * 1000); // 10m TTL
+    return result;
   } catch (err) {
     console.warn("[market] Failed to fetch Fear & Greed Index:", err);
     return null;
@@ -407,6 +520,10 @@ export type GlobalMetrics = {
 };
 
 export async function fetchGlobalCryptoMetrics(): Promise<GlobalMetrics | null> {
+  const cacheKey = "global:crypto:metrics";
+  const cached = getCached<GlobalMetrics>(cacheKey);
+  if (cached) return cached;
+
   try {
     const res = await fetch("https://api.coingecko.com/api/v3/global", {
       signal: AbortSignal.timeout(3000),
@@ -422,10 +539,12 @@ export async function fetchGlobalCryptoMetrics(): Promise<GlobalMetrics | null> 
     };
     const caps = json.data?.market_cap_percentage;
     if (!caps || typeof caps.btc !== "number") return null;
-    return {
+    const result = {
       btcDominance: caps.btc,
       ethDominance: caps.eth ?? 0,
     };
+    setCached(cacheKey, result, 5 * 60 * 1000); // 5m TTL
+    return result;
   } catch (err) {
     console.warn("[market] Failed to fetch Global Crypto Metrics:", err);
     return null;

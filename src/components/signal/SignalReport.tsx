@@ -358,8 +358,8 @@ Generated via Crypto Compass Lab.`
 Direction: ${result.direction} (Confluence: ${result.confluenceScore}/100 · Confidence: ${result.confidence})
 Current Price: $${fmtPrice(result.currentPrice)} (${percentage} 24h)
 Market Regime: ${result.marketRegime}
-🎯 Entry Zone: $${fmtPrice(result.entry)}
-🛡️ Stop Loss: $${fmtPrice(result.stopLoss)} (Risk: ${riskPct}%)
+🎯 Entry Model: ${result.entryType || "MARKET"} ($${fmtPrice(result.entry)})
+${result.entryZone ? `📍 Entry Zone: $${fmtPrice(result.entryZone.min)} - $${fmtPrice(result.entryZone.max)}\n` : ""}${result.triggerCondition ? `⚡ Trigger: ${result.triggerCondition}\n` : ""}🛡️ Stop Loss: $${fmtPrice(result.stopLoss)} (Risk: ${riskPct}%)
 🥇 Target 1: $${fmtPrice(result.target1)} (Reward: ${target1Pct}%)
 🥈 Target 2: $${fmtPrice(result.target2)}
 ${result.target3 ? `🥉 Target 3: $${fmtPrice(result.target3)}\n` : ""}⚖️ Risk/Reward: ${result.riskReward.toFixed(2)}R
@@ -580,23 +580,60 @@ Generated via Crypto Compass Lab.`;
       </section>
 
       {isNoTrade ? (
-        <div className="flex flex-col items-center justify-center gap-2 rounded-xl border border-border/80 bg-card/45 p-6 text-center">
-          <ShieldAlert className="h-7 w-7 text-muted-foreground/85" />
+        <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/80 bg-card/45 p-6 text-center">
+          <ShieldAlert className="h-8 w-8 text-muted-foreground/85" />
           <h4 className="text-sm font-semibold text-foreground">No Trade Setup Triggered</h4>
           <p className="text-xs text-muted-foreground max-w-sm">
             Current market structure does not satisfy high-confluence criteria. Directional edge is
             below threshold or hard quality filters prevented execution.
           </p>
-          {result.rejectionReasons && result.rejectionReasons.length > 0 && (
-            <div className="mt-3.5 text-left border border-border/30 rounded bg-background/50 p-3 max-w-md w-full space-y-1.5">
-              <span className="text-[9px] uppercase tracking-widest text-muted-foreground block font-bold">
-                Rejection Filters Tripped:
-              </span>
-              <ul className="list-disc list-inside text-[11px] text-bear space-y-0.5">
-                {result.rejectionReasons.map((r, i) => (
-                  <li key={i}>{r}</li>
-                ))}
-              </ul>
+
+          {result.rejectionHierarchy && (
+            <div className="mt-4 text-left border border-border/30 rounded-lg bg-background/50 p-4 max-w-lg w-full space-y-3">
+              {result.rejectionHierarchy.blockers.length > 0 && (
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-bear block font-bold flex items-center gap-1">
+                    <XCircle className="h-3.5 w-3.5" /> Hard Blockers:
+                  </span>
+                  <ul className="mt-1 space-y-1 text-xs text-bear/90">
+                    {result.rejectionHierarchy.blockers.map((b, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-bear font-mono">•</span>
+                        <span>{b}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.rejectionHierarchy.warnings.length > 0 && (
+                <div>
+                  <span className="text-[10px] uppercase tracking-widest text-amber-400 block font-bold flex items-center gap-1">
+                    ⚠️ Warnings / Friction:
+                  </span>
+                  <ul className="mt-1 space-y-1 text-xs text-amber-300/90">
+                    {result.rejectionHierarchy.warnings.map((w, i) => (
+                      <li key={i} className="flex items-start gap-1.5">
+                        <span className="text-amber-400 font-mono">•</span>
+                        <span>{w}</span>
+                      </li>
+                    ))}
+                  </ul>
+                </div>
+              )}
+
+              {result.rejectionHierarchy.context.length > 0 && (
+                <div className="pt-2 border-t border-border/20">
+                  <span className="text-[10px] uppercase tracking-widest text-muted-foreground block font-bold">
+                    ℹ️ Market Context:
+                  </span>
+                  <ul className="mt-1 space-y-0.5 text-[11px] text-muted-foreground">
+                    {result.rejectionHierarchy.context.map((c, i) => (
+                      <li key={i}>{c}</li>
+                    ))}
+                  </ul>
+                </div>
+              )}
             </div>
           )}
         </div>
@@ -651,19 +688,33 @@ Generated via Crypto Compass Lab.`;
             </div>
           </div>
 
-          {/* Trade Levels Cards */}
+          {/* Trade Levels Cards with Entry Models */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
             <div className="rounded-xl border border-border bg-card/60 p-4">
-              <div className="flex items-center gap-2 text-muted-foreground">
-                <Crosshair className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest">Entry</span>
+              <div className="flex items-center justify-between text-muted-foreground">
+                <div className="flex items-center gap-1.5">
+                  <Crosshair className="h-4 w-4 text-primary" />
+                  <span className="text-[10px] uppercase tracking-widest font-semibold">Entry</span>
+                </div>
+                {result.entryType && (
+                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                    {result.entryType}
+                  </span>
+                )}
               </div>
               <p className="tabular mt-2 text-xl font-bold text-foreground">
                 ${fmtPrice(result.entry)}
               </p>
-              <p className="mt-1 text-[10px] text-muted-foreground">
-                {result.setupType?.join(" · ") || "Market Structure Entry"}
-              </p>
+              {result.entryZone && (
+                <p className="tabular mt-0.5 text-[10px] text-muted-foreground font-mono">
+                  Zone: ${fmtPrice(result.entryZone.min)} - ${fmtPrice(result.entryZone.max)}
+                </p>
+              )}
+              {result.triggerCondition && (
+                <p className="mt-1 text-[9px] text-muted-foreground/90 line-clamp-2">
+                  {result.triggerCondition}
+                </p>
+              )}
             </div>
 
             <div className="rounded-xl border border-bear/40 bg-bear/5 p-4">

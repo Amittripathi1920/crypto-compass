@@ -13,59 +13,77 @@ import { ConfluenceEngine } from "./ConfluenceEngine";
 export class SignalEngine {
   public static run(
     symbol: string,
-    candles1d: Candle[],
-    candles4h: Candle[],
-    candles1h: Candle[],
-    candles15m: Candle[],
-    candles5m: Candle[],
+    candlesMacro: Candle[], // 1D (or 1W for swing, 4H for scalp)
+    candlesRegime: Candle[], // 4H (or 1D for swing, 1H for scalp)
+    candlesStructure: Candle[], // 1H (or 4H for swing, 15M for scalp)
+    candlesSetup: Candle[], // 15M (or 1H for swing, 5M for scalp)
+    candlesTrigger: Candle[], // 5M (or 15M for swing, 1M for scalp)
     tickerPrice: number,
     rawConfig?: PartialEngineConfig | undefined,
+    primaryTimeframe = "15m",
   ): Signal {
     const config = validateEngineConfig(rawConfig);
     const lastPrice =
       tickerPrice ||
-      candles5m[candles5m.length - 1]?.close ||
-      candles15m[candles15m.length - 1]?.close ||
+      candlesTrigger[candlesTrigger.length - 1]?.close ||
+      candlesSetup[candlesSetup.length - 1]?.close ||
       0;
 
-    // 1. Analyze 1D (Macro Trend Bias)
-    const ind1d = computeIndicators(candles1d);
-    const struct1d = MarketStructureEngine.detectDual(candles1d, 5, 3);
-    const macroBias = ind1d.bias as "bullish" | "bearish" | "neutral";
+    // 1. Analyze Macro Context (Macro Trend Bias)
+    const indMacro = computeIndicators(candlesMacro);
+    const structMacro = MarketStructureEngine.detectDual(candlesMacro, 5, 3);
+    const macroBias = indMacro.bias as "bullish" | "bearish" | "neutral";
 
-    // 2. Analyze 4H (Market Regime & Major External Structure)
-    const ind4h = computeIndicators(candles4h);
-    const struct4h = MarketStructureEngine.detectDual(candles4h, config.pivotStrength, 2);
-    const regime = MarketRegimeEngine.classify(candles4h, ind4h, struct4h);
-
-    // 3. Analyze 1H (Major Structure & Liquidity Map)
-    const ind1h = computeIndicators(candles1h);
-    const struct1h = MarketStructureEngine.detectDual(candles1h, config.pivotStrength, 2);
-    const atr1h = ind1h.atr || lastPrice * 0.015;
-    const liquidity1h = LiquidityEngine.mapLiquidity(candles1h, candles1d, struct1h.swings, atr1h);
-
-    // 4. Analyze 15M (Setup Timeframe: Sweeps, Order Blocks, FVGs, Internal Structure)
-    const ind15m = computeIndicators(candles15m);
-    const struct15m = MarketStructureEngine.detectDual(candles15m, config.pivotStrength, 2);
-    const atr15m = ind15m.atr || lastPrice * 0.008;
-    const liquidity15m = LiquidityEngine.mapLiquidity(
-      candles15m,
-      candles1d,
-      struct15m.swings,
-      atr15m,
+    // 2. Analyze Regime & Major Structure
+    const indRegime = computeIndicators(candlesRegime);
+    const structRegime = MarketStructureEngine.detectDual(
+      candlesRegime,
+      config.pivotStrength,
+      2,
     );
-    const zones15m = ZoneEngine.detectZones(candles15m, struct15m.swings, atr15m);
-    const fvgs15m = ZoneEngine.detectFVGs(candles15m, atr15m);
-    const sweep15m = LiquidityEngine.detectSweep(candles15m, liquidity15m, atr15m);
+    const regime = MarketRegimeEngine.classify(candlesRegime, indRegime, structRegime);
 
-    // 5. Analyze 5M (Micro Trigger: RVOL, Volatility, Momentum)
-    const ind5m = computeIndicators(candles5m);
-    const rvol5m = VolumeEngine.calculateRvol(candles5m);
-    const volStats5m = VolatilityEngine.analyze(candles5m, ind5m.atr, lastPrice);
+    // 3. Analyze Structure & Liquidity Map
+    const indStruct = computeIndicators(candlesStructure);
+    const structMajor = MarketStructureEngine.detectDual(
+      candlesStructure,
+      config.pivotStrength,
+      2,
+    );
+    const atrMajor = indStruct.atr || lastPrice * 0.015;
+    const liquidityMajor = LiquidityEngine.mapLiquidity(
+      candlesStructure,
+      candlesMacro,
+      structMajor.swings,
+      atrMajor,
+    );
+
+    // 4. Analyze Setup Timeframe: Sweeps, Order Blocks, FVGs, Internal Structure
+    const indSetup = computeIndicators(candlesSetup);
+    const structSetup = MarketStructureEngine.detectDual(
+      candlesSetup,
+      config.pivotStrength,
+      2,
+    );
+    const atrSetup = indSetup.atr || lastPrice * 0.008;
+    const liquiditySetup = LiquidityEngine.mapLiquidity(
+      candlesSetup,
+      candlesMacro,
+      structSetup.swings,
+      atrSetup,
+    );
+    const zonesSetup = ZoneEngine.detectZones(candlesSetup, structSetup.swings, atrSetup);
+    const fvgsSetup = ZoneEngine.detectFVGs(candlesSetup, atrSetup);
+    const sweepSetup = LiquidityEngine.detectSweep(candlesSetup, liquiditySetup, atrSetup);
+
+    // 5. Analyze Trigger Timeframe: RVOL, Volatility, Momentum
+    const indTrigger = computeIndicators(candlesTrigger);
+    const rvolTrigger = VolumeEngine.calculateRvol(candlesTrigger);
+    const volStatsTrigger = VolatilityEngine.analyze(candlesTrigger, indTrigger.atr, lastPrice);
 
     // Active setups for LONG
     const activeDemandZone =
-      zones15m.find(
+      zonesSetup.find(
         (z) =>
           z.type === "DEMAND" &&
           z.isFresh &&
@@ -73,18 +91,18 @@ export class SignalEngine {
           lastPrice >= z.bottomPrice * 0.99,
       ) || null;
     const activeBullishFvg =
-      fvgs15m.find(
+      fvgsSetup.find(
         (f) =>
           f.direction === "BULLISH" &&
           lastPrice <= f.topPrice * 1.01 &&
           lastPrice >= f.bottomPrice * 0.99,
       ) || null;
-    const bullSweep = sweep15m && sweep15m.direction === "BULLISH" ? sweep15m : null;
-    const momLong = MomentumEngine.isSupported(ind5m.rsi, ind5m.macd, "LONG");
+    const bullSweep = sweepSetup && sweepSetup.direction === "BULLISH" ? sweepSetup : null;
+    const momLong = MomentumEngine.isSupported(indTrigger.rsi, indTrigger.macd, "LONG");
 
     // Active setups for SHORT
     const activeSupplyZone =
-      zones15m.find(
+      zonesSetup.find(
         (z) =>
           z.type === "SUPPLY" &&
           z.isFresh &&
@@ -92,41 +110,41 @@ export class SignalEngine {
           lastPrice <= z.topPrice * 1.01,
       ) || null;
     const activeBearishFvg =
-      fvgs15m.find(
+      fvgsSetup.find(
         (f) =>
           f.direction === "BEARISH" &&
           lastPrice >= f.bottomPrice * 0.99 &&
           lastPrice <= f.topPrice * 1.01,
       ) || null;
-    const bearSweep = sweep15m && sweep15m.direction === "BEARISH" ? sweep15m : null;
-    const momShort = MomentumEngine.isSupported(ind5m.rsi, ind5m.macd, "SHORT");
+    const bearSweep = sweepSetup && sweepSetup.direction === "BEARISH" ? sweepSetup : null;
+    const momShort = MomentumEngine.isSupported(indTrigger.rsi, indTrigger.macd, "SHORT");
 
     // 6. Independent Long & Short Scoring
     const longScoreResult = ConfluenceEngine.evaluateDirection(
       "LONG",
       macroBias,
-      struct4h,
-      struct15m,
+      structRegime,
+      structSetup,
       bullSweep,
       activeDemandZone,
       activeBullishFvg,
-      rvol5m.rvol,
+      rvolTrigger.rvol,
       momLong.ok,
-      volStats5m.isHealthy,
+      volStatsTrigger.isHealthy,
       config,
     );
 
     const shortScoreResult = ConfluenceEngine.evaluateDirection(
       "SHORT",
       macroBias,
-      struct4h,
-      struct15m,
+      structRegime,
+      structSetup,
       bearSweep,
       activeSupplyZone,
       activeBearishFvg,
-      rvol5m.rvol,
+      rvolTrigger.rvol,
       momShort.ok,
-      volStats5m.isHealthy,
+      volStatsTrigger.isHealthy,
       config,
     );
 
@@ -139,16 +157,18 @@ export class SignalEngine {
     const relevantZone = isLong ? activeDemandZone : activeSupplyZone;
     const relevantFvg = isLong ? activeBullishFvg : activeBearishFvg;
     const relevantSwings = isLong
-      ? struct15m.swings.filter((s) => s.type === "low")
-      : struct15m.swings.filter((s) => s.type === "high");
+      ? structSetup.swings.filter((s) => s.type === "low")
+      : structSetup.swings.filter((s) => s.type === "high");
     const lastSwing = relevantSwings[relevantSwings.length - 1] || null;
 
-    // Check 5M micro confirmation
-    const has5mConfirmation =
-      rvol5m.isExpanding ||
-      (isLong ? ind5m.rsi >= 45 && ind5m.rsi <= 65 : ind5m.rsi <= 55 && ind5m.rsi >= 35);
+    // Trigger confirmation check
+    const hasTriggerConfirmation =
+      rvolTrigger.isExpanding ||
+      (isLong
+        ? indTrigger.rsi >= 45 && indTrigger.rsi <= 65
+        : indTrigger.rsi <= 55 && indTrigger.rsi >= 35);
 
-    // Calculate Entry
+    // Calculate Entry Model & Zones
     const entryResult = EntryEngine.calculateEntry(
       lastPrice,
       candidateDir,
@@ -156,52 +176,64 @@ export class SignalEngine {
       relevantZone,
       relevantFvg,
       lastSwing,
-      atr15m,
-      has5mConfirmation,
+      atrSetup,
+      hasTriggerConfirmation,
     );
     const entry = entryResult.entryPrice;
 
-    // Calculate Stop Loss
+    // Calculate Protected Structural Stop Loss
     const stopResult = StopLossEngine.calculateStop(
       entry,
       candidateDir,
-      struct15m.swings,
+      structSetup.swings,
       relevantZone,
       relevantFvg,
-      atr15m,
+      atrSetup,
       config.atrMultiplier * 0.25,
       config.maxStopLossAtrMultiplier,
       config.minStopLossAtrMultiplier,
     );
     const stopLoss = stopResult.stopLoss;
 
-    // Calculate Take Profit Targets
+    // Calculate Genuine Structural Take Profit Targets
     const targets = TakeProfitEngine.calculateTargets(
       entry,
       stopLoss,
       candidateDir,
-      liquidity1h,
-      zones15m,
-      atr15m,
+      [...liquidityMajor, ...liquiditySetup],
+      zonesSetup,
+      atrSetup,
+      config.minimumRR,
     );
 
-    // Calculate Risk & R:R Metrics
-    const riskAnalysis = RiskEngine.analyze(entry, stopLoss, targets, candidateDir, 1000, 1.0);
+    // Calculate Risk & Net R:R Metrics (including fees & slippage)
+    const riskAnalysis = RiskEngine.analyze(
+      entry,
+      stopLoss,
+      targets,
+      candidateDir,
+      1000,
+      1.0,
+      config.makerFeeBps,
+      config.takerFeeBps,
+      config.slippageBps,
+    );
     const tp2Rr = riskAnalysis ? riskAnalysis.riskReward.tp2 : 0;
 
     // Check if internal reversal CHoCH is present on LTF
     const hasLTFReversal = isLong
-      ? (struct15m.internalChoch || []).some((c) => c.type === "CHOCH_BULL")
-      : (struct15m.internalChoch || []).some((c) => c.type === "CHOCH_BEAR");
+      ? (structSetup.internalChoch || []).some((c) => c.type === "CHOCH_BULL")
+      : (structSetup.internalChoch || []).some((c) => c.type === "CHOCH_BEAR");
 
-    // 8. Resolve Setup & Apply Quality Gates
+    // 8. Resolve Setup & Apply Hard Quality Gates & Structured Rejection Hierarchy
     const resolution = ConfluenceEngine.resolveSetup(
       longScoreResult,
       shortScoreResult,
       stopResult.isValid,
       stopResult.reason,
-      volStats5m.isHealthy,
+      volStatsTrigger.isHealthy,
       tp2Rr,
+      targets.isStructural ?? true,
       entryResult.isConfirmed,
       regime,
       hasLTFReversal,
@@ -216,32 +248,32 @@ export class SignalEngine {
     if (relevantFvg) setupType.push("FVG_RETEST");
     if (
       isLong &&
-      (struct15m.internalBos?.some((b) => b.type === "BOS_BULL") ||
-        struct15m.bos.some((b) => b.type === "BOS_BULL"))
+      (structSetup.internalBos?.some((b) => b.type === "BOS_BULL") ||
+        structSetup.bos.some((b) => b.type === "BOS_BULL"))
     )
       setupType.push("BOS");
     if (
       isLong &&
-      (struct15m.internalChoch?.some((c) => c.type === "CHOCH_BULL") ||
-        struct15m.choch.some((c) => c.type === "CHOCH_BULL"))
+      (structSetup.internalChoch?.some((c) => c.type === "CHOCH_BULL") ||
+        structSetup.choch.some((c) => c.type === "CHOCH_BULL"))
     )
       setupType.push("CHoCH");
     if (
       !isLong &&
-      (struct15m.internalBos?.some((b) => b.type === "BOS_BEAR") ||
-        struct15m.bos.some((b) => b.type === "BOS_BEAR"))
+      (structSetup.internalBos?.some((b) => b.type === "BOS_BEAR") ||
+        structSetup.bos.some((b) => b.type === "BOS_BEAR"))
     )
       setupType.push("BOS");
     if (
       !isLong &&
-      (struct15m.internalChoch?.some((c) => c.type === "CHOCH_BEAR") ||
-        struct15m.choch.some((c) => c.type === "CHOCH_BEAR"))
+      (structSetup.internalChoch?.some((c) => c.type === "CHOCH_BEAR") ||
+        structSetup.choch.some((c) => c.type === "CHOCH_BEAR"))
     )
       setupType.push("CHoCH");
 
     const invalidation = isLong
-      ? `15M candle close below structural support at $${stopLoss.toLocaleString()}`
-      : `15M candle close above structural resistance at $${stopLoss.toLocaleString()}`;
+      ? `Closed candle below structural support (${stopResult.anchorType}) at $${stopLoss.toLocaleString()}`
+      : `Closed candle above structural resistance (${stopResult.anchorType}) at $${stopLoss.toLocaleString()}`;
 
     const reasons = resolution.selectedEvidence
       .filter((e) => e.aligned)
@@ -256,22 +288,32 @@ export class SignalEngine {
       longScore: resolution.longScore,
       shortScore: resolution.shortScore,
       marketRegime: regime,
+      timeframeRole: primaryTimeframe,
       timeframes: {
+        macro: macroBias.toUpperCase(),
+        setup: setupType.join("+") || "STRUCTURE",
+        trigger: resolution.decision !== "NO TRADE" ? "CONFIRMED" : "INSUFFICIENT",
+        execution: "5M",
+        // Backward compatibility
         "1D": macroBias.toUpperCase(),
         "4H": regime,
-        "1H": struct1h.bos.length ? "TRENDING" : "RANGING",
+        "1H": structMajor.bos.length ? "TRENDING" : "RANGING",
         "15M": setupType.join("+") || "NO_SETUP",
         "5M": resolution.decision !== "NO TRADE" ? "CONFIRMED" : "INSUFFICIENT",
       },
       setupType,
+      entryType: entryResult.entryType,
+      entryZone: entryResult.entryZone,
+      triggerCondition: entryResult.triggerCondition,
+      expirationCandles: entryResult.expirationCandles,
       confirmation: {
-        volume: rvol5m.isExpanding,
+        volume: rvolTrigger.isExpanding,
         momentum: isLong ? momLong.ok : momShort.ok,
         structure: isLong
-          ? struct15m.bos.some((b) => b.type === "BOS_BULL") ||
-            struct15m.choch.some((c) => c.type === "CHOCH_BULL")
-          : struct15m.bos.some((b) => b.type === "BOS_BEAR") ||
-            struct15m.choch.some((c) => c.type === "CHOCH_BEAR"),
+          ? structSetup.bos.some((b) => b.type === "BOS_BULL") ||
+            structSetup.choch.some((c) => c.type === "CHOCH_BULL")
+          : structSetup.bos.some((b) => b.type === "BOS_BEAR") ||
+            structSetup.choch.some((c) => c.type === "CHOCH_BEAR"),
         rejectionWick: !!relevantSweep,
       },
       entry,
@@ -281,6 +323,7 @@ export class SignalEngine {
       invalidation,
       reasons,
       rejectionReasons: resolution.rejectionReasons,
+      rejectionHierarchy: resolution.rejectionHierarchy,
       evidence: resolution.selectedEvidence,
       // Legacy aliases
       setupScore: resolution.confluenceScore,

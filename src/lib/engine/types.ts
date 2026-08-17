@@ -23,6 +23,8 @@ export type MarketRegime =
   | "HIGH_VOLATILITY"
   | "LOW_VOLATILITY";
 
+export type SwingClassification = "MAJOR" | "PROTECTED" | "INTERNAL" | "LIQUIDITY";
+
 export type SwingPoint = {
   index: number;
   price: number;
@@ -30,6 +32,9 @@ export type SwingPoint = {
   time: number;
   strength: number;
   isExternal?: boolean | undefined;
+  classification?: SwingClassification | undefined;
+  causesBos?: boolean | undefined;
+  causesChoch?: boolean | undefined;
 };
 
 export type BOS = {
@@ -61,7 +66,14 @@ export type MarketStructure = {
 };
 
 export type LiquidityLevelType =
-  "PDH" | "PDL" | "PWH" | "PWL" | "EQH" | "EQL" | "SWING_HIGH" | "SWING_LOW";
+  | "PDH"
+  | "PDL"
+  | "PWH"
+  | "PWL"
+  | "EQH"
+  | "EQL"
+  | "SWING_HIGH"
+  | "SWING_LOW";
 
 export type LiquidityLevel = {
   id: string;
@@ -101,6 +113,7 @@ export type Zone = {
   rvol?: number | undefined;
   displacementStrength?: number | undefined;
   mitigationPct?: number | undefined;
+  score?: number | undefined;
 };
 
 export type FVG = {
@@ -114,6 +127,7 @@ export type FVG = {
   isFresh: boolean;
   rvol?: number | undefined;
   displacementStrength?: number | undefined;
+  score?: number | undefined;
 };
 
 export type SetupType =
@@ -123,13 +137,27 @@ export type SetupType =
   | "DEMAND_ZONE"
   | "SUPPLY_ZONE"
   | "FVG_RETEST"
-  | "ORDER_BLOCK_RETEST";
+  | "ORDER_BLOCK_RETEST"
+  | "BREAKOUT";
+
+export type EntryType = "MARKET" | "LIMIT" | "BREAKOUT" | "CONFIRMATION";
+
+export type EntryZone = {
+  min: number;
+  max: number;
+};
 
 export type Confirmation = {
   volume: boolean;
   momentum: boolean;
   structure: boolean;
   rejectionWick?: boolean | undefined;
+};
+
+export type RejectionReasonHierarchy = {
+  blockers: string[];
+  warnings: string[];
+  context: string[];
 };
 
 export type EngineWeights = {
@@ -155,6 +183,10 @@ export type EngineConfig = {
   minimumLiquidityStrength: number;
   maxStopLossAtrMultiplier: number;
   minStopLossAtrMultiplier: number;
+  requireStructuralTargets: boolean;
+  makerFeeBps: number;
+  takerFeeBps: number;
+  slippageBps: number;
   weights: EngineWeights;
   minimumScore?: number | undefined;
   minimumSetupScore?: number | undefined;
@@ -174,11 +206,14 @@ export type EvidenceItem = {
   max: number;
   aligned: boolean;
   direction: "LONG" | "SHORT";
+  category?: "DIRECTION" | "TRADEABILITY" | undefined;
 };
 
 export type DirectionalScoreResult = {
   direction: "LONG" | "SHORT";
   score: number;
+  directionalScore: number;
+  tradeabilityScore: number;
   evidence: EvidenceItem[];
 };
 
@@ -186,6 +221,7 @@ export type Targets = {
   tp1: number;
   tp2: number;
   tp3: number;
+  isStructural?: boolean | undefined;
 };
 
 export type RiskReward = {
@@ -203,14 +239,24 @@ export type Signal = {
   longScore: number;
   shortScore: number;
   marketRegime: MarketRegime;
+  timeframeRole?: string | undefined;
   timeframes: {
-    "1D": string;
-    "4H": string;
-    "1H": string;
-    "15M": string;
-    "5M": string;
+    macro: string;
+    setup: string;
+    trigger: string;
+    execution: string;
+    // Legacy aliases
+    "1D"?: string;
+    "4H"?: string;
+    "1H"?: string;
+    "15M"?: string;
+    "5M"?: string;
   };
   setupType: SetupType[];
+  entryType: EntryType;
+  entryZone: EntryZone;
+  triggerCondition: string;
+  expirationCandles: number;
   confirmation: Confirmation;
   entry: number;
   stopLoss: number;
@@ -219,11 +265,19 @@ export type Signal = {
   invalidation: string;
   reasons: string[];
   rejectionReasons: string[];
+  rejectionHierarchy: RejectionReasonHierarchy;
   evidence: EvidenceItem[];
   // Legacy aliases
   setupScore: number;
   entryScore: number;
   finalScore: number;
+};
+
+export type TimeframeCascade = {
+  macro: { tf: string; candles: Candle[] };
+  setup: { tf: string; candles: Candle[] };
+  trigger: { tf: string; candles: Candle[] };
+  execution: { tf: string; candles: Candle[] };
 };
 
 export type TimeframeContext = {
@@ -232,12 +286,4 @@ export type TimeframeContext = {
   liquidity: LiquidityLevel[];
   zones: Zone[];
   fvgs: FVG[];
-};
-
-export type MultiTimeframeData = {
-  "5m": TimeframeContext & { candles: Candle[] };
-  "15m": TimeframeContext & { candles: Candle[] };
-  "1h": TimeframeContext & { candles: Candle[] };
-  "4h": TimeframeContext & { candles: Candle[] };
-  "1d": TimeframeContext & { candles: Candle[] };
 };

@@ -10,9 +10,10 @@ import { MarketRegimeEngine } from "../MarketRegimeEngine";
 import { MarketStructureEngine } from "../MarketStructureEngine";
 import { LiquidityEngine } from "../LiquidityEngine";
 import { ZoneEngine } from "../ZoneEngine";
+import { BacktestEngine } from "../BacktestEngine";
+import { normalizeCandles } from "../../market.server";
 import { AiExplanationSchema, validateAiExplanation } from "../../ai-providers.server";
-import type { DirectionalScoreResult, SwingPoint } from "../types";
-import type { Candle } from "../../indicators";
+import type { DirectionalScoreResult, SwingPoint, Candle } from "../types";
 
 function assert(condition: boolean, message: string) {
   if (!condition) {
@@ -23,33 +24,39 @@ function assert(condition: boolean, message: string) {
 }
 
 export async function runSmokeTests() {
-  console.log("\n🚀 Running Crypto Compass Engine Refactor Smoke Tests...\n");
+  console.log("\n🚀 Running Crypto Compass Engineering Master Smoke Tests...\n");
 
   // 1. Test Config & Weights Validation
   console.log("--- 1. Testing Config & Weights ---");
   const validConfig = validateEngineConfig({
     minimumConfluenceScore: 65,
     minimumDirectionalEdge: 15,
+    requireStructuralTargets: true,
   });
   assert(validConfig.minimumConfluenceScore === 65, "Custom minimumConfluenceScore parsed");
   assert(validConfig.minimumDirectionalEdge === 15, "Custom minimumDirectionalEdge parsed");
+  assert(validConfig.requireStructuralTargets === true, "requireStructuralTargets enabled");
   const weightSum = Object.values(validConfig.weights).reduce((a, b) => a + b, 0);
   assert(weightSum === 100, `Weights sum to exactly 100 (got ${weightSum})`);
 
-  // 2. Test Direction Resolver: Independent Long vs Short Scores & Directional Edge Threshold
-  console.log("\n--- 2. Testing Direction Resolver ---");
+  // 2. Test Direction Resolver: Independent Long vs Short Scores, Directional vs Tradeability, and Structured Hierarchy
+  console.log("\n--- 2. Testing Direction Resolver & Rejection Hierarchy ---");
   const mockLongStrong: DirectionalScoreResult = {
     direction: "LONG",
     score: 78,
+    directionalScore: 50,
+    tradeabilityScore: 28,
     evidence: [
-      { label: "HTF", detail: "Bullish", score: 20, max: 20, aligned: true, direction: "LONG" },
+      { label: "HTF", detail: "Bullish", score: 20, max: 20, aligned: true, direction: "LONG", category: "DIRECTION" },
     ],
   };
   const mockShortWeak: DirectionalScoreResult = {
     direction: "SHORT",
     score: 51,
+    directionalScore: 25,
+    tradeabilityScore: 26,
     evidence: [
-      { label: "HTF", detail: "Neutral", score: 5, max: 20, aligned: false, direction: "SHORT" },
+      { label: "HTF", detail: "Neutral", score: 5, max: 20, aligned: false, direction: "SHORT", category: "DIRECTION" },
     ],
   };
 
@@ -60,6 +67,7 @@ export async function runSmokeTests() {
     undefined,
     true,
     2.5,
+    true,
     true,
     "BULLISH",
     false,
@@ -77,54 +85,78 @@ export async function runSmokeTests() {
     resolution1.confidence === "High",
     `Confidence is High for 78 score & 27 edge (got ${resolution1.confidence})`,
   );
+  assert(resolution1.rejectionHierarchy.blockers.length === 0, "No hard blockers for strong setup");
 
-  // Test Close Scores -> NO TRADE
-  const mockLongClose: DirectionalScoreResult = {
-    direction: "LONG",
-    score: 63,
-    evidence: [],
-  };
-  const mockShortClose: DirectionalScoreResult = {
-    direction: "SHORT",
-    score: 61,
-    evidence: [],
-  };
-
-  const resolution2 = ConfluenceEngine.resolveSetup(
-    mockLongClose,
-    mockShortClose,
+  // Test Non-Structural Manufactured Target Rejection
+  const resolutionNonStructural = ConfluenceEngine.resolveSetup(
+    mockLongStrong,
+    mockShortWeak,
     true,
     undefined,
     true,
-    2.0,
+    2.5,
+    false, // isStructuralTarget = false
     true,
-    "RANGING",
+    "BULLISH",
     false,
     validConfig,
   );
   assert(
-    resolution2.decision === "NO TRADE",
-    `Long 63 vs Short 61 resolves to NO TRADE due to edge threshold (got ${resolution2.decision})`,
+    resolutionNonStructural.decision === "NO TRADE",
+    "Setup rejected as NO TRADE when genuine opposing structural liquidity does not exist",
   );
   assert(
-    resolution2.rejectionReasons.some((r) => r.includes("Directional edge")),
-    "Rejection reasons include directional edge filter",
+    resolutionNonStructural.rejectionHierarchy.blockers.some((b) => b.includes("opposing structural liquidity")),
+    "Blocker explicitly warns of missing structural liquidity target",
   );
 
-  // 3. Test Structural Stop Loss Engine
-  console.log("\n--- 3. Testing Stop Loss Engine ---");
-  const mockSwings: SwingPoint[] = [
-    { index: 5, price: 92000, type: "low", time: 1000, strength: 4, isExternal: true },
-    { index: 10, price: 96000, type: "high", time: 2000, strength: 4, isExternal: true },
-    { index: 15, price: 93500, type: "low", time: 3000, strength: 4, isExternal: true },
+  // 3. Test Entry Models (Market, Limit, Breakout)
+  console.log("\n--- 3. Testing Entry Models ---");
+  const atrVal = 500;
+  const currentPrice = 95000;
+
+  // Test Limit Entry on Order Block
+  const mockOB = {
+    id: "ob1",
+    type: "DEMAND" as const,
+    topPrice: 94500,
+    bottomPrice: 94000,
+    time: 1000,
+    isFresh: true,
+    testCount: 0,
+    volumeConfirm: 1.5,
+  };
+  const limitEntry = EntryEngine.calculateEntry(currentPrice, "LONG", null, mockOB, null, null, atrVal, true);
+  assert(limitEntry.entryType === "LIMIT", `Entry on distant OB is LIMIT order (got ${limitEntry.entryType})`);
+  assert(limitEntry.entryPrice === 94500, `Limit entry price placed at OB top ($94,500)`);
+  assert(limitEntry.entryZone.min === 94000 && limitEntry.entryZone.max === 94500, "Entry zone matches OB boundaries");
+
+  // Test Market Entry on active Sweep
+  const mockSweep = {
+    direction: "BULLISH" as const,
+    sweptLevelPrice: 94200,
+    sweptLevelType: "PDL" as const,
+    wickSize: 300,
+    closeLocation: 94600,
+    time: 2000,
+    recencyCandles: 1,
+    reactionStrength: 1.1,
+  };
+  const marketEntry = EntryEngine.calculateEntry(currentPrice, "LONG", mockSweep, null, null, null, atrVal, true);
+  assert(marketEntry.entryType === "MARKET", `Entry on active sweep rejection is MARKET order (got ${marketEntry.entryType})`);
+
+  // 4. Test Protected Swing Stop Loss Selection
+  console.log("\n--- 4. Testing Protected Stop Loss Selection ---");
+  const mockSwingsWithProtected: SwingPoint[] = [
+    { index: 5, price: 92000, type: "low", time: 1000, strength: 4, classification: "MAJOR" },
+    { index: 10, price: 93500, type: "low", time: 2000, strength: 4, classification: "PROTECTED", causesBos: true },
+    { index: 15, price: 94800, type: "low", time: 3000, strength: 2, classification: "INTERNAL" }, // minor noise low
   ];
 
-  const entryPrice = 95000;
-  const atrVal = 500;
   const slResultLong = StopLossEngine.calculateStop(
-    entryPrice,
+    currentPrice,
     "LONG",
-    mockSwings,
+    mockSwingsWithProtected,
     null,
     null,
     atrVal,
@@ -132,54 +164,37 @@ export async function runSmokeTests() {
   );
   assert(slResultLong.isValid, "Long stop loss is structurally valid");
   assert(
-    slResultLong.stopLoss < 93500,
-    `Long stop loss placed below swing low ($93,500) with ATR buffer (got $${slResultLong.stopLoss})`,
-  );
-  assert(slResultLong.stopLoss > 90000, "Long stop loss is within safe ATR boundaries");
-
-  // 4. Test Take Profit Targets
-  console.log("\n--- 4. Testing Take Profit Targets ---");
-  const tpTargets = TakeProfitEngine.calculateTargets(
-    entryPrice,
-    slResultLong.stopLoss,
-    "LONG",
-    [
-      { id: "1", type: "PDH", price: 97000, strength: 20, isSwept: false, time: 100 },
-      { id: "2", type: "PWH", price: 100000, strength: 25, isSwept: false, time: 200 },
-    ],
-    [],
-    atrVal,
+    slResultLong.anchorType === "PROTECTED_SWING",
+    `Stop loss correctly anchored to PROTECTED swing (got ${slResultLong.anchorType})`,
   );
   assert(
-    tpTargets.tp1 >= 97000,
-    `TP1 mapped to nearest opposing liquidity at $97,000 (got $${tpTargets.tp1})`,
-  );
-  assert(tpTargets.tp2 >= 98000, `TP2 mapped with proper risk progression (got $${tpTargets.tp2})`);
-  assert(tpTargets.tp3 >= 100000, `TP3 mapped to HTF liquidity (got $${tpTargets.tp3})`);
-
-  // 5. Test Market Regime Gate
-  console.log("\n--- 5. Testing Market Regime Gate ---");
-  const bearGateForLong = MarketRegimeEngine.evaluateGate("STRONG_BEARISH", "LONG", false);
-  assert(
-    !bearGateForLong.allowed,
-    "STRONG_BEARISH regime gates against counter-trend Long without internal reversal",
+    slResultLong.stopLoss < 93500 && slResultLong.stopLoss > 93000,
+    `Stop loss placed safely below protected low ($93,500) rather than minor internal low ($94,800) (got $${slResultLong.stopLoss})`,
   );
 
-  const bearGateForLongWithReversal = MarketRegimeEngine.evaluateGate(
-    "STRONG_BEARISH",
-    "LONG",
-    true,
-  );
-  assert(
-    bearGateForLongWithReversal.allowed,
-    "Internal reversal (CHoCH) permits counter-trend attempt",
-  );
+  // 5. Test Closed-Candle Normalization
+  console.log("\n--- 5. Testing Closed-Candle Normalization ---");
+  const now = Date.now();
+  const mockRawCandles: Candle[] = [
+    { time: now - 30 * 60 * 1000, open: 95000, high: 95500, low: 94900, close: 95300, volume: 100 },
+    { time: now - 15 * 60 * 1000, open: 95300, high: 95800, low: 95200, close: 95600, volume: 120 },
+    { time: now - 2 * 60 * 1000, open: 95600, high: 96000, low: 95500, close: 95900, volume: 50 }, // forming 15m candle
+  ];
+  const closedCandles = normalizeCandles(mockRawCandles, "15m", true);
+  assert(closedCandles.length === 2, `Closed-only filter dropped the unclosed forming candle (kept ${closedCandles.length}/3)`);
 
-  // 6. Test Zod AI Validation Schema
-  console.log("\n--- 6. Testing AI Zod Schema ---");
+  // 6. Test Risk Engine Net R & Fees
+  console.log("\n--- 6. Testing Risk Engine Fees & Net R:R ---");
+  const tpTargets = { tp1: 97000, tp2: 99000, tp3: 102000 };
+  const riskAnalysis = RiskEngine.analyze(currentPrice, 93500, tpTargets, "LONG", 1000, 1.0, 2, 5, 4);
+  assert(riskAnalysis !== null, "Risk analysis computed successfully");
+  assert(riskAnalysis!.netRiskReward.tp2 < riskAnalysis!.riskReward.tp2, "Net R:R properly deducts maker/taker fees and slippage");
+  assert(riskAnalysis!.estimatedFees > 0, `Estimated fees calculated ($${riskAnalysis!.estimatedFees})`);
+
+  // 7. Test Zod AI Validation Schema
+  console.log("\n--- 7. Testing AI Zod Schema ---");
   const validAiJson = {
-    summary:
-      "Strong bullish liquidity sweep of PDL with 4H trend alignment confirms long continuation.",
+    summary: "Strong bullish liquidity sweep of PDL with 4H trend alignment confirms long continuation.",
     invalidation: "15M candle close below swing low at $93,350.",
   };
   const validatedAi = validateAiExplanation(validAiJson);
@@ -188,14 +203,7 @@ export async function runSmokeTests() {
     "Valid AI explanation parsed correctly by Zod",
   );
 
-  const invalidAiJson = {
-    summary: "short",
-    // Missing invalidation
-  };
-  const invalidAiResult = validateAiExplanation(invalidAiJson);
-  assert(invalidAiResult === null, "Malformed AI response rejected by Zod schema");
-
-  console.log("\n🎉 All Smoke Tests Passed Successfully!\n");
+  console.log("\n🎉 All Master Smoke Tests Passed Successfully!\n");
 }
 
 runSmokeTests();

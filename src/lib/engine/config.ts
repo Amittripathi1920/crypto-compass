@@ -24,6 +24,10 @@ export const DEFAULT_CONFIG: EngineConfig = {
   minimumLiquidityStrength: 10,
   maxStopLossAtrMultiplier: 4.5, // Stop loss beyond 4.5 ATR is considered too wide / high risk
   minStopLossAtrMultiplier: 0.4, // Stop loss tighter than 0.4 ATR is considered market noise
+  requireStructuralTargets: true, // Must have genuine opposing liquidity; rejects manufactured targets
+  makerFeeBps: 2, // 0.02% maker fee
+  takerFeeBps: 5, // 0.05% taker fee
+  slippageBps: 4, // 4 bps estimated execution slippage
   weights: WEIGHTS,
   // Backward compatibility aliases
   minimumScore: 60,
@@ -64,6 +68,10 @@ export const EngineConfigSchema = z.object({
   minimumLiquidityStrength: z.number().min(1).max(100).default(10),
   maxStopLossAtrMultiplier: z.number().min(2).max(10).default(4.5),
   minStopLossAtrMultiplier: z.number().min(0.1).max(2).default(0.4),
+  requireStructuralTargets: z.boolean().default(true),
+  makerFeeBps: z.number().min(0).max(100).default(2),
+  takerFeeBps: z.number().min(0).max(100).default(5),
+  slippageBps: z.number().min(0).max(100).default(4),
   weights: EngineWeightsSchema.default(WEIGHTS),
   minimumScore: z.number().optional(),
   minimumSetupScore: z.number().optional(),

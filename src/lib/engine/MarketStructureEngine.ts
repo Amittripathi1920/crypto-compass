@@ -44,6 +44,7 @@ export class MarketStructureEngine {
           time: c.time,
           strength: pivotStrength,
           isExternal,
+          classification: isExternal ? "MAJOR" : "INTERNAL",
         });
       } else if (isLow) {
         swings.push({
@@ -53,11 +54,12 @@ export class MarketStructureEngine {
           time: c.time,
           strength: pivotStrength,
           isExternal,
+          classification: isExternal ? "MAJOR" : "INTERNAL",
         });
       }
     }
 
-    // 2. Detect BOS and CHoCH sequentially
+    // 2. Detect BOS and CHoCH sequentially and mark Protected origin swings
     let lastHigh: SwingPoint | null = null;
     let lastLow: SwingPoint | null = null;
     let trendDirection: "BULL" | "BEAR" | "NEUTRAL" = "NEUTRAL";
@@ -90,6 +92,11 @@ export class MarketStructureEngine {
             isExternal,
           });
           trendDirection = "BULL";
+          // Mark recent swing low as protected reversal low
+          if (lastLow) {
+            lastLow.classification = "PROTECTED";
+            lastLow.causesChoch = true;
+          }
         } else {
           // Trend continuation: BOS
           bos.push({
@@ -101,6 +108,11 @@ export class MarketStructureEngine {
             isExternal,
           });
           trendDirection = "BULL";
+          // Mark recent swing low as protected higher low (HL)
+          if (lastLow) {
+            lastLow.classification = "PROTECTED";
+            lastLow.causesBos = true;
+          }
         }
         lastHigh = null;
       }
@@ -117,6 +129,11 @@ export class MarketStructureEngine {
             isExternal,
           });
           trendDirection = "BEAR";
+          // Mark recent swing high as protected reversal high
+          if (lastHigh) {
+            lastHigh.classification = "PROTECTED";
+            lastHigh.causesChoch = true;
+          }
         } else {
           // Trend continuation: BOS
           bos.push({
@@ -128,6 +145,11 @@ export class MarketStructureEngine {
             isExternal,
           });
           trendDirection = "BEAR";
+          // Mark recent swing high as protected lower high (LH)
+          if (lastHigh) {
+            lastHigh.classification = "PROTECTED";
+            lastHigh.causesBos = true;
+          }
         }
         lastLow = null;
       }
@@ -157,13 +179,19 @@ export class MarketStructureEngine {
 
     // Merge swings and sort by time
     const allSwings = [...external.swings, ...internal.swings].sort((a, b) => a.time - b.time);
-    // Deduplicate any overlapping swing indices
+    // Deduplicate any overlapping swing indices, keeping the higher-level (MAJOR/PROTECTED) classification
     const uniqueSwings: SwingPoint[] = [];
-    const seenIndices = new Set<number>();
+    const seenIndices = new Map<number, SwingPoint>();
+
     for (const s of allSwings) {
-      if (!seenIndices.has(s.index)) {
-        seenIndices.add(s.index);
+      const existing = seenIndices.get(s.index);
+      if (!existing) {
+        seenIndices.set(s.index, s);
         uniqueSwings.push(s);
+      } else if (s.classification === "PROTECTED" || s.classification === "MAJOR") {
+        existing.classification = s.classification;
+        existing.causesBos = existing.causesBos || s.causesBos;
+        existing.causesChoch = existing.causesChoch || s.causesChoch;
       }
     }
 

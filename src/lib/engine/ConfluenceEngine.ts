@@ -7,6 +7,7 @@ import type {
   EvidenceItem,
   DirectionalScoreResult,
   MarketRegime,
+  RejectionReasonHierarchy,
 } from "./types";
 import { DEFAULT_CONFIG } from "./config";
 import { MarketRegimeEngine } from "./MarketRegimeEngine";
@@ -33,7 +34,7 @@ export class ConfluenceEngine {
     const weights = config.weights;
     const evidence: EvidenceItem[] = [];
 
-    // 1. Higher-Timeframe Trend Alignment (Max: weights.HTF_TrendAlignment, default 20)
+    // 1. Higher-Timeframe Trend Alignment (Max: weights.HTF_TrendAlignment, default 20) [DIRECTION]
     const isHtfAligned = isLong ? htfMacroBias === "bullish" : htfMacroBias === "bearish";
     const isHtfNeutral = htfMacroBias === "neutral";
     const htfScore = isHtfAligned
@@ -45,18 +46,18 @@ export class ConfluenceEngine {
     evidence.push({
       label: "HTF Trend Alignment",
       detail: isHtfAligned
-        ? `1D macro trend is aligned with ${direction} setup.`
+        ? `Macro trend is aligned with ${direction} setup.`
         : isHtfNeutral
-          ? "1D macro trend is neutral/consolidating."
-          : `1D macro trend opposes ${direction} bias.`,
+          ? "Macro trend is neutral/consolidating."
+          : `Macro trend opposes ${direction} bias.`,
       score: htfScore,
       max: weights.HTF_TrendAlignment,
       aligned: isHtfAligned,
       direction,
+      category: "DIRECTION",
     });
 
-    // 2. External Market Structure (Max: weights.ExternalMarketStructure, default 15)
-    // Checks 4H/1H BOS and CHoCH
+    // 2. External Market Structure (Max: weights.ExternalMarketStructure, default 15) [DIRECTION]
     const hasExtBos = isLong
       ? (structHTF.externalBos || structHTF.bos).some((b) => b.type === "BOS_BULL")
       : (structHTF.externalBos || structHTF.bos).some((b) => b.type === "BOS_BEAR");
@@ -78,10 +79,10 @@ export class ConfluenceEngine {
       max: weights.ExternalMarketStructure,
       aligned: hasExtStructure,
       direction,
+      category: "DIRECTION",
     });
 
-    // 3. Internal Market Structure (Max: weights.InternalMarketStructure, default 10)
-    // Checks 15M internal pullback reversal or BOS
+    // 3. Internal Market Structure (Max: weights.InternalMarketStructure, default 10) [DIRECTION]
     const hasIntBos = isLong
       ? (structLTF.internalBos || structLTF.bos).some((b) => b.type === "BOS_BULL")
       : (structLTF.internalBos || structLTF.bos).some((b) => b.type === "BOS_BEAR");
@@ -107,18 +108,18 @@ export class ConfluenceEngine {
       max: weights.InternalMarketStructure,
       aligned: hasIntStructure,
       direction,
+      category: "DIRECTION",
     });
 
-    // 4. Liquidity Sweep Quality & Recency (Max: weights.LiquiditySweep, default 15)
+    // 4. Liquidity Sweep Quality & Recency (Max: weights.LiquiditySweep, default 15) [DIRECTION]
     let liqScore = 0;
     let liqDetail = "No key liquidity pool swept recently.";
     let liqAligned = false;
 
     if (sweep && sweep.direction === (isLong ? "BULLISH" : "BEARISH")) {
       liqAligned = true;
-      // Recency decay: 0-3 candles = 100%, 4-8 candles = 75%, 9+ candles = 50%
       const recencyFactor =
-        sweep.recencyCandles! <= 3 ? 1.0 : sweep.recencyCandles! <= 8 ? 0.75 : 0.5;
+        (sweep.recencyCandles ?? 0) <= 3 ? 1.0 : (sweep.recencyCandles ?? 0) <= 8 ? 0.75 : 0.5;
       const qualityFactor = sweep.reactionStrength
         ? Math.min(1.2, Math.max(0.7, sweep.reactionStrength))
         : 1.0;
@@ -126,7 +127,7 @@ export class ConfluenceEngine {
         weights.LiquiditySweep,
         Math.round(weights.LiquiditySweep * recencyFactor * qualityFactor),
       );
-      liqDetail = `Swept ${sweep.sweptLevelType} liquidity at $${sweep.sweptLevelPrice.toLocaleString()} with strong rejection (${sweep.recencyCandles ?? 0} candles ago, RVOL: ${sweep.rvol ?? 1.0}x).`;
+      liqDetail = `Swept ${sweep.sweptLevelType} liquidity at $${sweep.sweptLevelPrice.toLocaleString()} with rejection (${sweep.recencyCandles ?? 0} candles ago, RVOL: ${sweep.rvol ?? 1.0}x).`;
     } else {
       liqScore = Math.round(weights.LiquiditySweep * 0.2);
     }
@@ -138,9 +139,10 @@ export class ConfluenceEngine {
       max: weights.LiquiditySweep,
       aligned: liqAligned,
       direction,
+      category: "DIRECTION",
     });
 
-    // 5. Supply / Demand Order Block (Max: weights.SupplyDemandZone, default 10)
+    // 5. Supply / Demand Order Block (Max: weights.SupplyDemandZone, default 10) [TRADEABILITY]
     let zoneScore = 0;
     let zoneDetail = "No fresh Order Block in immediate proximity.";
     let zoneAligned = false;
@@ -162,9 +164,10 @@ export class ConfluenceEngine {
       max: weights.SupplyDemandZone,
       aligned: zoneAligned,
       direction,
+      category: "TRADEABILITY",
     });
 
-    // 6. Fair Value Gap Retest (Max: weights.FVGRetest, default 10)
+    // 6. Fair Value Gap Retest (Max: weights.FVGRetest, default 10) [TRADEABILITY]
     let fvgScore = 0;
     let fvgDetail = "No active Fair Value Gap in proximity.";
     let fvgAligned = false;
@@ -186,9 +189,10 @@ export class ConfluenceEngine {
       max: weights.FVGRetest,
       aligned: fvgAligned,
       direction,
+      category: "TRADEABILITY",
     });
 
-    // 7. Volume Expansion (Max: weights.VolumeExpansion, default 10)
+    // 7. Volume Expansion (Max: weights.VolumeExpansion, default 10) [TRADEABILITY]
     let volScore = 0;
     if (rvol >= 1.5) volScore = weights.VolumeExpansion;
     else if (rvol >= 1.2) volScore = Math.round(weights.VolumeExpansion * 0.8);
@@ -199,15 +203,16 @@ export class ConfluenceEngine {
       label: "Volume Expansion",
       detail:
         rvol >= 1.2
-          ? `Supporting institutional volume expansion (RVOL: ${rvol.toFixed(2)}x).`
-          : `Consolidation / normal volume levels (RVOL: ${rvol.toFixed(2)}x).`,
+          ? `Supporting volume expansion (RVOL: ${rvol.toFixed(2)}x).`
+          : `Normal volume levels (RVOL: ${rvol.toFixed(2)}x).`,
       score: volScore,
       max: weights.VolumeExpansion,
       aligned: rvol >= 1.2,
       direction,
+      category: "TRADEABILITY",
     });
 
-    // 8. Momentum Alignment (Max: weights.MomentumAlignment, default 5)
+    // 8. Momentum Alignment (Max: weights.MomentumAlignment, default 5) [TRADEABILITY]
     const momScore = momentumOk
       ? weights.MomentumAlignment
       : Math.round(weights.MomentumAlignment * 0.3);
@@ -220,9 +225,10 @@ export class ConfluenceEngine {
       max: weights.MomentumAlignment,
       aligned: momentumOk,
       direction,
+      category: "TRADEABILITY",
     });
 
-    // 9. Volatility Regime Support (Max: weights.VolatilityRegime, default 5)
+    // 9. Volatility Regime Support (Max: weights.VolatilityRegime, default 5) [TRADEABILITY]
     const volRegimeScore = isVolHealthy
       ? weights.VolatilityRegime
       : Math.round(weights.VolatilityRegime * 0.3);
@@ -235,13 +241,22 @@ export class ConfluenceEngine {
       max: weights.VolatilityRegime,
       aligned: isVolHealthy,
       direction,
+      category: "TRADEABILITY",
     });
 
     const totalScore = evidence.reduce((sum, item) => sum + item.score, 0);
+    const directionalScore = evidence
+      .filter((e) => e.category === "DIRECTION")
+      .reduce((sum, item) => sum + item.score, 0);
+    const tradeabilityScore = evidence
+      .filter((e) => e.category === "TRADEABILITY")
+      .reduce((sum, item) => sum + item.score, 0);
 
     return {
       direction,
       score: Math.min(100, Math.max(0, totalScore)),
+      directionalScore,
+      tradeabilityScore,
       evidence,
     };
   }
@@ -257,6 +272,7 @@ export class ConfluenceEngine {
     stopLossReason: string | undefined,
     isVolHealthy: boolean,
     tp2Rr: number,
+    isStructuralTarget: boolean,
     isEntryConfirmed: boolean,
     regime: MarketRegime,
     hasLTFReversal: boolean,
@@ -269,6 +285,7 @@ export class ConfluenceEngine {
     longScore: number;
     shortScore: number;
     rejectionReasons: string[];
+    rejectionHierarchy: RejectionReasonHierarchy;
     selectedEvidence: EvidenceItem[];
   } {
     const longScore = longResult.score;
@@ -285,52 +302,64 @@ export class ConfluenceEngine {
     const selectedEvidence =
       candidateDirection === "LONG" ? longResult.evidence : shortResult.evidence;
 
-    const rejectionReasons: string[] = [];
+    const blockers: string[] = [];
+    const warnings: string[] = [];
+    const context: string[] = [];
 
-    // Quality Gate 1: Directional Edge Threshold
+    // Context information
+    context.push(`Market Regime: ${regime}`);
+    context.push(
+      `Long score (${longScore}) vs Short score (${shortScore}) with ${directionalEdge} pts edge.`,
+    );
+
+    // Gate 1: Directional Edge Threshold
     if (directionalEdge < minEdge) {
-      rejectionReasons.push(
+      blockers.push(
         `Directional edge (${directionalEdge} pts) is below required threshold (${minEdge} pts). Long (${longScore}) vs Short (${shortScore}) is in equilibrium.`,
       );
     }
 
-    // Quality Gate 2: Minimum Confluence Score
+    // Gate 2: Minimum Confluence Score
     if (candidateScore < minConfluence) {
-      rejectionReasons.push(
+      blockers.push(
         `Confluence score (${candidateScore}/100) is below minimum required threshold (${minConfluence}/100).`,
       );
     }
 
-    // Quality Gate 3: Structural Stop Loss Validation
+    // Gate 3: Structural Stop Loss Validation
     if (!stopLossIsValid) {
-      rejectionReasons.push(
+      blockers.push(
         stopLossReason || "Structural stop loss distance is invalid or exceeds risk limit.",
       );
     }
 
-    // Quality Gate 4: Risk / Reward Ratio Threshold
-    if (tp2Rr < minRR) {
-      rejectionReasons.push(
+    // Gate 4: Structural Target Existence & Risk / Reward Ratio Threshold
+    if (config.requireStructuralTargets && !isStructuralTarget) {
+      blockers.push(
+        `No genuine opposing structural liquidity target exists beyond minimum R:R threshold (${minRR.toFixed(2)}R). Rejecting manufactured target.`,
+      );
+    } else if (tp2Rr < minRR) {
+      blockers.push(
         `Risk/reward ratio (${tp2Rr.toFixed(2)}R) is below minimum required (${minRR.toFixed(2)}R).`,
       );
     }
 
-    // Quality Gate 5: Market Regime Gate
+    // Gate 5: Market Regime Gate
     const regimeGate = MarketRegimeEngine.evaluateGate(regime, candidateDirection, hasLTFReversal);
     if (!regimeGate.allowed) {
-      rejectionReasons.push(regimeGate.reason);
+      blockers.push(regimeGate.reason);
+    } else if (regimeGate.penalty > 0) {
+      warnings.push(regimeGate.reason);
     }
 
-    // Quality Gate 6: Volatility Bounds
+    // Gate 6: Volatility Bounds
     if (!isVolHealthy) {
-      rejectionReasons.push(
-        "Market volatility is outside healthy bounds (extreme chop or stagnation).",
-      );
+      warnings.push("Market volatility is outside healthy bounds (extreme chop or stagnation).");
     }
 
-    // Quality Gate 7: Entry Confirmation
+    // Gate 7: Entry Confirmation
     if (!isEntryConfirmed) {
-      rejectionReasons.push(
+      warnings.push(
         "Entry trigger lacks micro-confirmation (rejection wick or RVOL expansion on lower timeframe).",
       );
     }
@@ -343,8 +372,9 @@ export class ConfluenceEngine {
       confidence = "Moderate";
     }
 
+    const rejectionReasons = [...blockers, ...warnings];
     const decision: "LONG" | "SHORT" | "NO TRADE" =
-      rejectionReasons.length === 0 ? candidateDirection : "NO TRADE";
+      blockers.length === 0 ? candidateDirection : "NO TRADE";
 
     return {
       decision,
@@ -354,6 +384,7 @@ export class ConfluenceEngine {
       longScore,
       shortScore,
       rejectionReasons,
+      rejectionHierarchy: { blockers, warnings, context },
       selectedEvidence,
     };
   }
