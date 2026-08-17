@@ -120,14 +120,18 @@ function RootShell({ children }: { children: ReactNode }) {
   );
 }
 
+import { TooltipProvider } from "@/components/ui/tooltip";
+
 function RootComponent() {
   const { queryClient } = Route.useRouteContext();
 
   return (
     <QueryClientProvider client={queryClient}>
-      {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
-      <Outlet />
-      <Toaster closeButton position="top-right" theme="dark" />
+      <TooltipProvider delayDuration={150}>
+        {/* Required: nested routes render here. Removing <Outlet /> breaks all child routes. */}
+        <Outlet />
+        <Toaster closeButton position="top-right" theme="dark" />
+      </TooltipProvider>
     </QueryClientProvider>
   );
 }

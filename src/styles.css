@@ -148,3 +148,65 @@
     linear-gradient(to bottom, var(--grid) 1px, transparent 1px);
   background-size: 44px 44px;
 }
+
+/* Micro-interaction & Animation Utilities */
+@utility hover-lift {
+  transition: transform 0.2s cubic-bezier(0.16, 1, 0.3, 1), box-shadow 0.2s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.2s ease;
+  &:hover {
+    transform: translateY(-2px);
+    box-shadow: 0 8px 24px -6px color-mix(in oklab, var(--primary) 18%, transparent);
+  }
+}
+
+@utility hover-lift-subtle {
+  transition: transform 0.18s cubic-bezier(0.16, 1, 0.3, 1), border-color 0.18s ease;
+  &:hover {
+    transform: translateY(-1px);
+  }
+}
+
+@utility glow-bull {
+  box-shadow: 0 0 25px -4px color-mix(in oklab, var(--bull) 28%, transparent);
+}
+
+@utility glow-bear {
+  box-shadow: 0 0 25px -4px color-mix(in oklab, var(--bear) 28%, transparent);
+}
+
+@utility glow-primary {
+  box-shadow: 0 0 25px -4px color-mix(in oklab, var(--primary) 25%, transparent);
+}
+
+@utility pulse-slow {
+  animation: pulse 3s cubic-bezier(0.4, 0, 0.6, 1) infinite;
+}
+
+@keyframes float-subtle {
+  0%, 100% { transform: translateY(0); }
+  50% { transform: translateY(-3px); }
+}
+
+@utility animate-float {
+  animation: float-subtle 4s ease-in-out infinite;
+}
+
+@keyframes shimmer-sweep {
+  0% { transform: translateX(-100%); }
+  100% { transform: translateX(200%); }
+}
+
+@utility shimmer-effect {
+  position: relative;
+  overflow: hidden;
+  &::after {
+    content: "";
+    position: absolute;
+    top: 0;
+    left: 0;
+    right: 0;
+    bottom: 0;
+    background: linear-gradient(90deg, transparent, color-mix(in oklab, white 8%, transparent), transparent);
+    animation: shimmer-sweep 2.5s infinite;
+  }
+}
+

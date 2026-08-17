@@ -16,6 +16,7 @@ import {
   Activity,
   AlertTriangle,
   Info,
+  HelpCircle,
 } from "lucide-react";
 import type { OteSignal } from "@/lib/ote-engine/types";
 import { PriceChart } from "./PriceChart";
@@ -23,6 +24,7 @@ import { ExchangeStatus } from "./ExchangeStatus";
 import { fmtPct, fmtPrice } from "./format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
 export function OteSignalReport({ result }: { result: OteSignal }) {
@@ -82,8 +84,12 @@ Crypto Compass Lab OTE Engine v2.`;
       {/* Header Banner */}
       <section
         className={cn(
-          "relative overflow-hidden rounded-xl border p-5",
-          isLong ? "border-bull/40" : isShort ? "border-bear/40" : "border-border",
+          "relative overflow-hidden rounded-xl border p-5 transition-all duration-300 hover-lift",
+          isLong
+            ? "border-bull/40 glow-bull"
+            : isShort
+              ? "border-bear/40 glow-bear"
+              : "border-border",
         )}
         style={{
           background:
@@ -93,8 +99,8 @@ Crypto Compass Lab OTE Engine v2.`;
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
             <div className="flex items-center gap-2">
-              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary">
-                Smart Money OTE v2
+              <span className="text-[10px] font-bold uppercase tracking-[0.2em] text-primary flex items-center gap-1">
+                <Flame className="h-3 w-3 text-amber-400" /> Smart Money OTE v2
               </span>
               <span className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 · {result.symbol}/USDT ({result.timeframe.toUpperCase()})
@@ -102,32 +108,43 @@ Crypto Compass Lab OTE Engine v2.`;
             </div>
 
             <div className={cn("mt-1.5 flex items-center gap-2.5", dirColor)}>
-              <DirIcon className="h-8 w-8" strokeWidth={2.5} />
+              <DirIcon className="h-8 w-8 animate-float" strokeWidth={2.5} />
               <h2 className="text-4xl font-black tracking-tight">{result.direction}</h2>
               {result.setupGrade !== "NO_SETUP" && (
-                <span
-                  className={cn(
-                    "text-xs font-black uppercase px-2 py-0.5 rounded border ml-2",
-                    result.setupGrade === "A+"
-                      ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        "text-xs font-black uppercase px-2.5 py-0.5 rounded border ml-2 cursor-help transition-transform hover:scale-105",
+                        result.setupGrade === "A+"
+                          ? "border-emerald-500/50 bg-emerald-500/15 text-emerald-400"
+                          : result.setupGrade === "A"
+                            ? "border-bull/40 bg-bull/10 text-bull"
+                            : "border-amber-500/40 bg-amber-500/10 text-amber-400",
+                      )}
+                    >
+                      Grade {result.setupGrade}
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    {result.setupGrade === "A+"
+                      ? "A+ Setup: HTF Macro aligned + Major sweep (PDH/PDL) + Strong MSS displacement + Fresh FVG inside 61.8%-78.6% OTE Zone + >= 2.5R target."
                       : result.setupGrade === "A"
-                        ? "border-bull/40 bg-bull/10 text-bull"
-                        : "border-amber-500/40 bg-amber-500/10 text-amber-400",
-                  )}
-                >
-                  Grade {result.setupGrade}
-                </span>
+                        ? "A Setup: Confirmed Liquidity Sweep + MSS displacement + Retest in Discount/Premium + >= 2.0R target."
+                        : "B Setup: Internal liquidity raid + CHoCH + >= 1.8R target."}
+                  </TooltipContent>
+                </Tooltip>
               )}
             </div>
 
             <p className="mt-1 text-xs text-muted-foreground">
               Institutional Quality:{" "}
-              <span className="font-semibold text-foreground">{result.qualityScore}/100</span> ·
+              <span className="font-bold text-foreground">{result.qualityScore}/100</span> ·
               Net R:R:{" "}
-              <span className="font-semibold text-foreground">
+              <span className="font-bold text-foreground">
                 {result.targets.netRR.toFixed(2)}R
               </span>{" "}
-              · HTF: <span className="font-semibold text-foreground">{result.htfBias}</span>
+              · HTF Bias: <span className="font-bold text-foreground">{result.htfBias}</span>
             </p>
           </div>
 
@@ -144,83 +161,111 @@ Crypto Compass Lab OTE Engine v2.`;
               variant="outline"
               size="sm"
               onClick={handleShare}
-              className="h-9 gap-1.5 border-border bg-background/50 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground self-center"
+              className="h-9 gap-1.5 border-border bg-background/50 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground self-center transition-all hover:scale-105 active:scale-95"
             >
               <Share2 className="h-3.5 w-3.5" /> Share OTE
             </Button>
           </div>
         </div>
 
-        {/* 4-Pillar Visual Breakdown Bar */}
+        {/* 4-Pillar Visual Breakdown Bar with Tooltips */}
         <div className="mt-5 grid grid-cols-2 gap-2.5 sm:grid-cols-4">
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
-              <Layers className="h-3 w-3 text-primary" /> 1. Macro Bias
-            </span>
-            <span className="text-xs font-bold block mt-1 text-foreground">
-              {result.htfBias}
-            </span>
-            <span className="text-[9px] text-muted-foreground block mt-0.5">
-              1D/4H Structural Trend
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 hover-lift-subtle transition-all cursor-help">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
+                  <Layers className="h-3 w-3 text-primary" /> 1. Macro Bias
+                </span>
+                <span className="text-xs font-bold block mt-1 text-foreground">
+                  {result.htfBias}
+                </span>
+                <span className="text-[9px] text-muted-foreground block mt-0.5">
+                  1D/4H Structural Flow
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs">
+              Higher timeframe macro directional bias. Aligns trade execution with systemic institutional capital flows.
+            </TooltipContent>
+          </Tooltip>
 
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
-              <Zap className="h-3 w-3 text-amber-400" /> 2. Liquidity Sweep
-            </span>
-            <span
-              className={cn(
-                "text-xs font-bold block mt-1",
-                result.sweep ? "text-bull" : "text-muted-foreground",
-              )}
-            >
-              {result.sweep ? `${result.sweep.levelType} Purged` : "No Active Sweep"}
-            </span>
-            <span className="text-[9px] text-muted-foreground block mt-0.5">
-              {result.sweep ? `${result.sweep.rvol}x RVOL Rejection` : "Awaiting stop purge"}
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 hover-lift-subtle transition-all cursor-help">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
+                  <Zap className="h-3 w-3 text-amber-400" /> 2. Liquidity Sweep
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-bold block mt-1",
+                    result.sweep ? "text-bull" : "text-muted-foreground",
+                  )}
+                >
+                  {result.sweep ? `${result.sweep.levelType} Purged` : "No Active Sweep"}
+                </span>
+                <span className="text-[9px] text-muted-foreground block mt-0.5">
+                  {result.sweep ? `${result.sweep.rvol}x RVOL Rejection` : "Awaiting stop purge"}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs">
+              Liquidity Purge: When smart money triggers resting retail stop losses (PDH/PDL/Equal Extremes) before reversing.
+            </TooltipContent>
+          </Tooltip>
 
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
-              <TrendingUp className="h-3 w-3 text-primary" /> 3. MSS & Impulse
-            </span>
-            <span
-              className={cn(
-                "text-xs font-bold block mt-1",
-                result.displacement ? "text-bull" : "text-muted-foreground",
-              )}
-            >
-              {result.displacement
-                ? `${result.displacement.displacementAtrRatio}x ATR MSS`
-                : "No Displacement"}
-            </span>
-            <span className="text-[9px] text-muted-foreground block mt-0.5">
-              {result.displacement?.fvg ? "FVG Imbalance Formed" : "Market structure break"}
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 hover-lift-subtle transition-all cursor-help">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
+                  <TrendingUp className="h-3 w-3 text-primary" /> 3. MSS & Impulse
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-bold block mt-1",
+                    result.displacement ? "text-bull" : "text-muted-foreground",
+                  )}
+                >
+                  {result.displacement
+                    ? `${result.displacement.displacementAtrRatio}x ATR MSS`
+                    : "No Displacement"}
+                </span>
+                <span className="text-[9px] text-muted-foreground block mt-0.5">
+                  {result.displacement?.fvg ? "FVG Imbalance Formed" : "Market structure break"}
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs">
+              Market Structure Shift (MSS): Impulsive displacement candle breaking the local counter-trend pivot with closed body.
+            </TooltipContent>
+          </Tooltip>
 
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
-              <Flame className="h-3 w-3 text-amber-400" /> 4. OTE Retest
-            </span>
-            <span
-              className={cn(
-                "text-xs font-bold block mt-1",
-                result.fibZone?.inOteZone ? "text-bull" : "text-amber-400",
-              )}
-            >
-              {result.fibZone?.inOteZone
-                ? "In 61.8%-78.6% Zone"
-                : result.fibZone?.inDiscountOrPremium
-                  ? "In Discount/Premium"
-                  : "Awaiting Retest"}
-            </span>
-            <span className="text-[9px] text-muted-foreground block mt-0.5">
-              Optimal discount entry
-            </span>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 hover-lift-subtle transition-all cursor-help">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold flex items-center gap-1">
+                  <Flame className="h-3 w-3 text-amber-400" /> 4. OTE Retest
+                </span>
+                <span
+                  className={cn(
+                    "text-xs font-bold block mt-1",
+                    result.fibZone?.inOteZone ? "text-bull" : "text-amber-400",
+                  )}
+                >
+                  {result.fibZone?.inOteZone
+                    ? "In 61.8%-78.6% Zone"
+                    : result.fibZone?.inDiscountOrPremium
+                      ? "In Discount/Premium"
+                      : "Awaiting Retest"}
+                </span>
+                <span className="text-[9px] text-muted-foreground block mt-0.5">
+                  Optimal discount entry
+                </span>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="max-w-xs text-xs">
+              Optimal Trade Entry (OTE): Retracement into the 61.8% to 78.6% Fibonacci discount (for longs) or premium (for shorts).
+            </TooltipContent>
+          </Tooltip>
         </div>
 
         <p className="mt-4 text-sm leading-relaxed text-foreground/90 font-medium">
@@ -231,7 +276,7 @@ Crypto Compass Lab OTE Engine v2.`;
       {/* No Trade Rejection Hierarchy vs Trade Levels */}
       {isNoTrade ? (
         <div className="flex flex-col items-center justify-center gap-3 rounded-xl border border-border/80 bg-card/45 p-6 text-center">
-          <ShieldAlert className="h-8 w-8 text-muted-foreground/85" />
+          <ShieldAlert className="h-8 w-8 text-muted-foreground/85 animate-pulse" />
           <h4 className="text-sm font-bold text-foreground">No Institutional OTE Setup Triggered</h4>
           <p className="text-xs text-muted-foreground max-w-sm">
             Institutional criteria (Liquidity Sweep $\to$ MSS Displacement $\to$ OTE Retest) not met.
@@ -273,123 +318,187 @@ Crypto Compass Lab OTE Engine v2.`;
         </div>
       ) : (
         <div className="space-y-4">
-          {/* Trade Execution Level Cards */}
+          {/* Trade Execution Level Cards with Tooltips */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-primary/40 bg-primary/5 p-4">
-              <div className="flex items-center justify-between text-primary">
-                <div className="flex items-center gap-1.5">
-                  <Crosshair className="h-4 w-4" />
-                  <span className="text-[10px] uppercase tracking-widest font-bold">OTE Entry</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-primary/40 bg-primary/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center justify-between text-primary">
+                    <div className="flex items-center gap-1.5">
+                      <Crosshair className="h-4 w-4" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold">OTE Entry</span>
+                    </div>
+                    <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
+                      {result.entry.type}
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-foreground">
+                    ${fmtPrice(result.entry.entryPrice)}
+                  </p>
+                  <p className="tabular mt-0.5 text-[10px] text-muted-foreground font-mono">
+                    Zone: ${fmtPrice(result.entry.entryZone.min)} - ${fmtPrice(result.entry.entryZone.max)}
+                  </p>
+                  <p className="mt-1 text-[9px] text-muted-foreground/90 line-clamp-2">
+                    {result.entry.triggerRule}
+                  </p>
                 </div>
-                <span className="text-[9px] font-bold uppercase px-1.5 py-0.5 rounded bg-primary/20 text-primary border border-primary/30">
-                  {result.entry.type}
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-black text-foreground">
-                ${fmtPrice(result.entry.entryPrice)}
-              </p>
-              <p className="tabular mt-0.5 text-[10px] text-muted-foreground font-mono">
-                Zone: ${fmtPrice(result.entry.entryZone.min)} - ${fmtPrice(result.entry.entryZone.max)}
-              </p>
-              <p className="mt-1 text-[9px] text-muted-foreground/90 line-clamp-2">
-                {result.entry.triggerRule}
-              </p>
-            </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Entry model calibrated to FVG mitigation or 70.5% OTE sweet-spot limit order.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-xl border border-bear/40 bg-bear/5 p-4">
-              <div className="flex items-center gap-2 text-bear">
-                <ShieldAlert className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest font-bold">
-                  Protected Invalidation
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-black text-bear">
-                ${fmtPrice(result.stopLoss.stopLossPrice)}
-              </p>
-              <p className="tabular mt-0.5 text-[10px] text-muted-foreground">
-                Risk: {result.stopLoss.stopDistancePct}% ({result.stopLoss.stopDistanceAtr}x ATR)
-              </p>
-              <p className="mt-1 text-[9px] text-muted-foreground/80 line-clamp-2">
-                {result.stopLoss.invalidationStatement}
-              </p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-bear/40 bg-bear/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center gap-2 text-bear">
+                    <ShieldAlert className="h-4 w-4" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">
+                      Protected Invalidation
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-bear">
+                    ${fmtPrice(result.stopLoss.stopLossPrice)}
+                  </p>
+                  <p className="tabular mt-0.5 text-[10px] text-muted-foreground">
+                    Risk: {result.stopLoss.stopDistancePct}% ({result.stopLoss.stopDistanceAtr}x ATR)
+                  </p>
+                  <p className="mt-1 text-[9px] text-muted-foreground/80 line-clamp-2">
+                    {result.stopLoss.invalidationStatement}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Anchored behind the exact price extreme of the liquidity sweep pivot plus ATR buffer.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-xl border border-bull/40 bg-bull/5 p-4">
-              <div className="flex items-center gap-2 text-bull">
-                <Target className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest font-bold">
-                  TP1 (De-Risk / BE)
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-black text-bull">
-                ${fmtPrice(result.targets.tp1.price)}
-              </p>
-              <p className="tabular mt-0.5 text-[10px] text-muted-foreground">
-                +{result.targets.tp1.pctGain}% ({result.targets.tp1.rMultiple}R)
-              </p>
-              <p className="mt-1 text-[9px] text-muted-foreground/90">
-                {result.targets.tp1.label}
-              </p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-bull/40 bg-bull/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center gap-2 text-bull">
+                    <Target className="h-4 w-4" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">
+                      TP1 (De-Risk / BE)
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-bull">
+                    ${fmtPrice(result.targets.tp1.price)}
+                  </p>
+                  <p className="tabular mt-0.5 text-[10px] text-muted-foreground">
+                    +{result.targets.tp1.pctGain}% ({result.targets.tp1.rMultiple}R)
+                  </p>
+                  <p className="mt-1 text-[9px] text-muted-foreground/90">
+                    {result.targets.tp1.label}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Take 30%-50% partial profit at TP1 and move Stop Loss to Break-Even (Entry).
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-xl border border-bull/40 bg-bull/5 p-4">
-              <div className="flex items-center gap-2 text-bull">
-                <Target className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest font-bold">
-                  TP2 (Major Objective)
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-black text-bull">
-                ${fmtPrice(result.targets.tp2.price)}
-              </p>
-              <p className="tabular mt-0.5 text-[10px] text-muted-foreground">
-                Net: +{result.targets.tp2.pctGain}% ({result.targets.netRR}R Net)
-              </p>
-              <p className="mt-1 text-[9px] text-muted-foreground/90">
-                {result.targets.tp2.label}
-              </p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-bull/40 bg-bull/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center gap-2 text-bull">
+                    <Target className="h-4 w-4" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">
+                      TP2 (Major Objective)
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-bull">
+                    ${fmtPrice(result.targets.tp2.price)}
+                  </p>
+                  <p className="tabular mt-0.5 text-[10px] text-muted-foreground">
+                    Net: +{result.targets.tp2.pctGain}% ({result.targets.netRR}R Net)
+                  </p>
+                  <p className="mt-1 text-[9px] text-muted-foreground/90">
+                    {result.targets.tp2.label}
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Major opposing liquidity pool (PDH/PDL or unmitigated Supply/Demand) requiring at least 2.0R.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
-          {/* OTE Golden Zone Fib breakdown */}
+          {/* OTE Golden Zone Fib breakdown with Tooltips */}
           {result.fibZone && (
-            <div className="rounded-xl border border-border/70 bg-card/40 p-4 space-y-3">
-              <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
-                <Flame className="h-3.5 w-3.5 text-amber-400" /> Optimal Trade Entry (OTE) Fib Retracement Map
-              </h4>
+            <div className="rounded-xl border border-border/70 bg-card/40 p-4 space-y-3 hover-lift-subtle transition-all">
+              <div className="flex items-center justify-between">
+                <h4 className="text-xs font-bold uppercase tracking-wider text-muted-foreground flex items-center gap-1.5">
+                  <Flame className="h-3.5 w-3.5 text-amber-400" /> Optimal Trade Entry (OTE) Fib Retracement Map
+                </h4>
+                <span className="text-[10px] text-muted-foreground font-mono">
+                  Origin: ${fmtPrice(result.fibZone.swingOrigin)} &rarr; Extreme: ${fmtPrice(result.fibZone.swingExtreme)}
+                </span>
+              </div>
               <div className="grid grid-cols-2 gap-2 sm:grid-cols-4 text-center">
-                <div className="rounded border border-border/40 bg-background/50 p-2">
-                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-                    50.0% Equilibrium
-                  </span>
-                  <span className="text-sm font-bold font-mono block mt-0.5 text-foreground">
-                    ${fmtPrice(result.fibZone.fib500)}
-                  </span>
-                </div>
-                <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2">
-                  <span className="text-[9px] uppercase tracking-wider text-amber-400 block font-bold">
-                    61.8% Golden Pocket
-                  </span>
-                  <span className="text-sm font-bold font-mono block mt-0.5 text-amber-300">
-                    ${fmtPrice(result.fibZone.fib618)}
-                  </span>
-                </div>
-                <div className="rounded border border-primary/40 bg-primary/10 p-2">
-                  <span className="text-[9px] uppercase tracking-wider text-primary block font-bold">
-                    70.5% OTE Sweet Spot
-                  </span>
-                  <span className="text-sm font-bold font-mono block mt-0.5 text-primary">
-                    ${fmtPrice(result.fibZone.fib705)}
-                  </span>
-                </div>
-                <div className="rounded border border-border/40 bg-background/50 p-2">
-                  <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-                    78.6% Deep Retest
-                  </span>
-                  <span className="text-sm font-bold font-mono block mt-0.5 text-foreground">
-                    ${fmtPrice(result.fibZone.fib786)}
-                  </span>
-                </div>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="rounded border border-border/40 bg-background/50 p-2 hover-lift-subtle transition-all cursor-help">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
+                        50.0% Equilibrium
+                      </span>
+                      <span className="text-sm font-bold font-mono block mt-0.5 text-foreground">
+                        ${fmtPrice(result.fibZone.fib500)}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Equilibrium dividing Premium (expensive) from Discount (cheap).
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="rounded border border-amber-500/40 bg-amber-500/10 p-2 hover-lift-subtle transition-all cursor-help">
+                      <span className="text-[9px] uppercase tracking-wider text-amber-400 block font-bold">
+                        61.8% Golden Pocket
+                      </span>
+                      <span className="text-sm font-bold font-mono block mt-0.5 text-amber-300">
+                        ${fmtPrice(result.fibZone.fib618)}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Golden Pocket: First high-probability institutional entry boundary.
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="rounded border border-primary/40 bg-primary/10 p-2 hover-lift-subtle transition-all cursor-help">
+                      <span className="text-[9px] uppercase tracking-wider text-primary block font-bold">
+                        70.5% OTE Sweet Spot
+                      </span>
+                      <span className="text-sm font-bold font-mono block mt-0.5 text-primary">
+                        ${fmtPrice(result.fibZone.fib705)}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    OTE Sweet Spot: Optimal mathematical risk-to-reward retracement level.
+                  </TooltipContent>
+                </Tooltip>
+
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <div className="rounded border border-border/40 bg-background/50 p-2 hover-lift-subtle transition-all cursor-help">
+                      <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
+                        78.6% Deep Retest
+                      </span>
+                      <span className="text-sm font-bold font-mono block mt-0.5 text-foreground">
+                        ${fmtPrice(result.fibZone.fib786)}
+                      </span>
+                    </div>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="text-xs">
+                    Deep discount limit before invalidation thesis is threatened.
+                  </TooltipContent>
+                </Tooltip>
               </div>
             </div>
           )}

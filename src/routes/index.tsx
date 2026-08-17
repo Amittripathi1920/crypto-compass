@@ -48,6 +48,7 @@ import {
   SelectValue,
 } from "@/components/ui/select";
 import { Skeleton } from "@/components/ui/skeleton";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import type { SignalResult } from "@/lib/signal-types";
 import type { OteSignal } from "@/lib/ote-engine/types";
 
@@ -342,38 +343,52 @@ function Index() {
               Institutional OTE Engine v2 across live multi-exchange liquidity data.
             </p>
 
-            {/* Strategy Selection Tab Switcher */}
+            {/* Strategy Selection Tab Switcher with Tooltips */}
             <div className="mt-6 flex flex-wrap gap-2 border-t border-border/40 pt-4">
-              <button
-                type="button"
-                onClick={() => setStrategyTab("classic")}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all border",
-                  strategyTab === "classic"
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card/60 text-muted-foreground border-border hover:bg-accent hover:text-foreground",
-                )}
-              >
-                <Sparkles className="h-4 w-4" />
-                <span>Classic Confluence Engine (v1)</span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setStrategyTab("classic")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all border hover-lift-subtle active:scale-95",
+                      strategyTab === "classic"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-card/60 text-muted-foreground border-border hover:bg-accent hover:text-foreground",
+                    )}
+                  >
+                    <Sparkles className="h-4 w-4" />
+                    <span>Classic Confluence Engine (v1)</span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  Deterministic multi-timeframe scoring (0-100), protected swing stops, genuine liquidity targets, and directional edge gating.
+                </TooltipContent>
+              </Tooltip>
 
-              <button
-                type="button"
-                onClick={() => setStrategyTab("ote")}
-                className={cn(
-                  "flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all border",
-                  strategyTab === "ote"
-                    ? "bg-primary text-primary-foreground border-primary shadow-sm"
-                    : "bg-card/60 text-muted-foreground border-border hover:bg-accent hover:text-foreground",
-                )}
-              >
-                <Flame className="h-4 w-4 text-amber-400" />
-                <span>Institutional OTE Engine (v2 — New Strategy)</span>
-                <span className="rounded bg-amber-400/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-300">
-                  SMC
-                </span>
-              </button>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <button
+                    type="button"
+                    onClick={() => setStrategyTab("ote")}
+                    className={cn(
+                      "flex items-center gap-2 rounded-lg px-4 py-2.5 text-xs font-bold transition-all border hover-lift-subtle active:scale-95",
+                      strategyTab === "ote"
+                        ? "bg-primary text-primary-foreground border-primary shadow-sm"
+                        : "bg-card/60 text-muted-foreground border-border hover:bg-accent hover:text-foreground",
+                    )}
+                  >
+                    <Flame className="h-4 w-4 text-amber-400" />
+                    <span>Institutional OTE Engine (v2 — New Strategy)</span>
+                    <span className="rounded bg-amber-400/20 px-1.5 py-0.2 text-[9px] font-black uppercase text-amber-300">
+                      SMC
+                    </span>
+                  </button>
+                </TooltipTrigger>
+                <TooltipContent side="bottom" className="max-w-xs text-xs">
+                  4-Pillar Smart Money methodology: Liquidity Purge (PDH/PDL Sweep) &rarr; Displacement MSS &rarr; 61.8%-78.6% Fib Discount Retest.
+                </TooltipContent>
+              </Tooltip>
             </div>
           </div>
         </div>
@@ -537,79 +552,107 @@ function Index() {
                   </summary>
 
                   <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-4 pt-3.5 mt-2 border-t border-border/20">
-                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                        <span>Min Confluence</span>
-                        <span className="text-foreground font-bold font-mono">{minScore}/100</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="40"
-                        max="85"
-                        step="5"
-                        value={minScore}
-                        onChange={(e) => setMinScore(Number(e.target.value))}
-                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                      />
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40 hover-lift-subtle transition-all cursor-help">
+                          <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                            <span>Min Confluence</span>
+                            <span className="text-foreground font-bold font-mono">{minScore}/100</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="40"
+                            max="85"
+                            step="5"
+                            value={minScore}
+                            onChange={(e) => setMinScore(Number(e.target.value))}
+                            className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Minimum confluence score required before triggering a valid trade. Default: 60/100.
+                      </TooltipContent>
+                    </Tooltip>
 
-                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                        <span>Min R:R Ratio</span>
-                        <span className="text-foreground font-bold font-mono">
-                          {minRR.toFixed(1)}R
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="1.0"
-                        max="3.0"
-                        step="0.25"
-                        value={minRR}
-                        onChange={(e) => setMinRR(Number(e.target.value))}
-                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                      />
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40 hover-lift-subtle transition-all cursor-help">
+                          <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                            <span>Min R:R Ratio</span>
+                            <span className="text-foreground font-bold font-mono">
+                              {minRR.toFixed(1)}R
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="1.0"
+                            max="3.0"
+                            step="0.25"
+                            value={minRR}
+                            onChange={(e) => setMinRR(Number(e.target.value))}
+                            className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Minimum Risk-to-Reward ratio to opposing structural liquidity. Setups with lower R:R are rejected.
+                      </TooltipContent>
+                    </Tooltip>
 
-                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                        <span>ATR Buffer</span>
-                        <span className="text-foreground font-bold font-mono">
-                          {atrMult.toFixed(1)}x
-                        </span>
-                      </div>
-                      <input
-                        type="range"
-                        min="0.5"
-                        max="3.0"
-                        step="0.25"
-                        value={atrMult}
-                        onChange={(e) => setAtrMult(Number(e.target.value))}
-                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                      />
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40 hover-lift-subtle transition-all cursor-help">
+                          <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                            <span>ATR Buffer</span>
+                            <span className="text-foreground font-bold font-mono">
+                              {atrMult.toFixed(1)}x
+                            </span>
+                          </div>
+                          <input
+                            type="range"
+                            min="0.5"
+                            max="3.0"
+                            step="0.25"
+                            value={atrMult}
+                            onChange={(e) => setAtrMult(Number(e.target.value))}
+                            className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Volatility buffer added beyond structural pivots to protect against noise wicks.
+                      </TooltipContent>
+                    </Tooltip>
 
-                    <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40">
-                      <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                        <span>Pivot Strength</span>
-                        <span className="text-foreground font-bold font-mono">{pivotStr} bars</span>
-                      </div>
-                      <input
-                        type="range"
-                        min="2"
-                        max="7"
-                        step="1"
-                        value={pivotStr}
-                        onChange={(e) => setPivotStr(Number(e.target.value))}
-                        className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                      />
-                    </div>
+                    <Tooltip>
+                      <TooltipTrigger asChild>
+                        <div className="space-y-1 bg-background/40 p-2.5 rounded-lg border border-border/40 hover-lift-subtle transition-all cursor-help">
+                          <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                            <span>Pivot Strength</span>
+                            <span className="text-foreground font-bold font-mono">{pivotStr} bars</span>
+                          </div>
+                          <input
+                            type="range"
+                            min="2"
+                            max="7"
+                            step="1"
+                            value={pivotStr}
+                            onChange={(e) => setPivotStr(Number(e.target.value))}
+                            className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                          />
+                        </div>
+                      </TooltipTrigger>
+                      <TooltipContent side="top" className="text-xs">
+                        Number of bars to the left/right required to confirm an external swing high or low.
+                      </TooltipContent>
+                    </Tooltip>
                   </div>
                 </details>
 
                 <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-border/40">
                   <Button
-                    className="flex-grow font-semibold"
+                    className="flex-grow font-bold hover-lift-subtle transition-all active:scale-95"
                     size="lg"
                     disabled={mutation.isPending || keyMissing || bulkScanning}
                     onClick={() => {
@@ -630,7 +673,7 @@ function Index() {
                   </Button>
                   <Button
                     variant="outline"
-                    className="flex-grow border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground"
+                    className="flex-grow border-border bg-background/50 hover:bg-accent text-muted-foreground hover:text-foreground hover-lift-subtle transition-all active:scale-95"
                     size="lg"
                     disabled={patternMutation.isPending || bulkScanning}
                     onClick={() => {
@@ -651,7 +694,7 @@ function Index() {
                   </Button>
                   <Button
                     variant="default"
-                    className="flex-grow bg-bull/90 hover:bg-bull text-white font-bold"
+                    className="flex-grow bg-bull/90 hover:bg-bull text-white font-bold hover-lift transition-all active:scale-95 glow-bull"
                     size="lg"
                     disabled={
                       mutation.isPending || patternMutation.isPending || bulkScanning || keyMissing
@@ -688,57 +731,71 @@ function Index() {
                 </div>
 
                 <div className="grid gap-3 sm:grid-cols-2 pt-2">
-                  <div className="space-y-1 bg-background/40 p-3 rounded-lg border border-border/40">
-                    <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                      <span>Minimum Required R:R</span>
-                      <span className="text-foreground font-bold font-mono">
-                        {oteMinRR.toFixed(1)}R
-                      </span>
-                    </div>
-                    <input
-                      type="range"
-                      min="1.5"
-                      max="4.0"
-                      step="0.25"
-                      value={oteMinRR}
-                      onChange={(e) => setOteMinRR(Number(e.target.value))}
-                      className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
-                    />
-                    <span className="text-[9px] text-muted-foreground/80 block">
-                      Rejects trades without at least {oteMinRR}R to opposing liquidity
-                    </span>
-                  </div>
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="space-y-1 bg-background/40 p-3 rounded-lg border border-border/40 hover-lift-subtle transition-all cursor-help">
+                        <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                          <span>Minimum Required R:R</span>
+                          <span className="text-foreground font-bold font-mono">
+                            {oteMinRR.toFixed(1)}R
+                          </span>
+                        </div>
+                        <input
+                          type="range"
+                          min="1.5"
+                          max="4.0"
+                          step="0.25"
+                          value={oteMinRR}
+                          onChange={(e) => setOteMinRR(Number(e.target.value))}
+                          className="w-full accent-primary bg-muted border border-border h-1 rounded-full cursor-pointer mt-1"
+                        />
+                        <span className="text-[9px] text-muted-foreground/80 block">
+                          Rejects trades without at least {oteMinRR}R to opposing liquidity
+                        </span>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Rejects setups where nearest major opposing unswept liquidity pool gives less than {oteMinRR}R.
+                    </TooltipContent>
+                  </Tooltip>
 
-                  <div className="space-y-1 bg-background/40 p-3 rounded-lg border border-border/40">
-                    <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
-                      <span>Minimum Setup Grade</span>
-                      <span className="text-foreground font-bold font-mono">
-                        Grade {oteMinGrade}
-                      </span>
-                    </div>
-                    <div className="grid grid-cols-3 gap-2 mt-1">
-                      {(["B", "A", "A+"] as const).map((grade) => (
-                        <button
-                          key={grade}
-                          type="button"
-                          onClick={() => setOteMinGrade(grade)}
-                          className={cn(
-                            "rounded py-1 text-xs font-bold border transition-colors",
-                            oteMinGrade === grade
-                              ? "bg-primary text-primary-foreground border-primary"
+                  <Tooltip>
+                    <TooltipTrigger asChild>
+                      <div className="space-y-1 bg-background/40 p-3 rounded-lg border border-border/40 hover-lift-subtle transition-all cursor-help">
+                        <div className="flex justify-between items-center text-[10px] uppercase tracking-widest text-muted-foreground font-semibold">
+                          <span>Minimum Setup Grade</span>
+                          <span className="text-foreground font-bold font-mono">
+                            Grade {oteMinGrade}
+                          </span>
+                        </div>
+                        <div className="grid grid-cols-3 gap-2 mt-1">
+                          {(["B", "A", "A+"] as const).map((grade) => (
+                            <button
+                              key={grade}
+                              type="button"
+                              onClick={() => setOteMinGrade(grade)}
+                              className={cn(
+                                "rounded py-1 text-xs font-bold border transition-all hover:scale-105 active:scale-95",
+                                oteMinGrade === grade
+                              ? "bg-primary text-primary-foreground border-primary shadow-sm"
                               : "bg-background/60 text-muted-foreground border-border hover:bg-accent",
-                          )}
-                        >
-                          Grade {grade}
-                        </button>
-                      ))}
-                    </div>
-                  </div>
+                              )}
+                            >
+                              Grade {grade}
+                            </button>
+                          ))}
+                        </div>
+                      </div>
+                    </TooltipTrigger>
+                    <TooltipContent side="top" className="text-xs">
+                      Filter setups by institutional quality: Grade B (Internal CHoCH), Grade A (MSS + FVG), Grade A+ (HTF aligned + Major PDH/PDL Sweep).
+                    </TooltipContent>
+                  </Tooltip>
                 </div>
 
                 <div className="mt-4 flex flex-wrap gap-2 pt-2 border-t border-border/40">
                   <Button
-                    className="flex-grow font-bold bg-amber-500 hover:bg-amber-600 text-black"
+                    className="flex-grow font-bold bg-amber-500 hover:bg-amber-600 text-black hover-lift transition-all active:scale-95"
                     size="lg"
                     disabled={oteMutation.isPending || keyMissing || bulkScanning}
                     onClick={() => {
@@ -760,7 +817,7 @@ function Index() {
 
                   <Button
                     variant="outline"
-                    className="flex-grow border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold"
+                    className="flex-grow border-amber-500/40 bg-amber-500/10 hover:bg-amber-500/20 text-amber-300 font-bold hover-lift transition-all active:scale-95"
                     size="lg"
                     disabled={oteMutation.isPending || bulkScanning || keyMissing}
                     onClick={handleOteScanAll}

@@ -13,6 +13,9 @@ import {
   TrendingUp,
   Activity,
   Layers,
+  Info,
+  HelpCircle,
+  Sparkles,
 } from "lucide-react";
 import { useTradeTracker } from "@/hooks/useTradeTracker";
 import type { SignalResult } from "@/lib/signal-types";
@@ -21,13 +24,38 @@ import { ExchangeStatus } from "./ExchangeStatus";
 import { fmtPct, fmtPrice } from "./format";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Tooltip, TooltipContent, TooltipTrigger } from "@/components/ui/tooltip";
 import { toast } from "sonner";
 
-function Stat({ label, value, hint }: { label: string; value: string; hint?: string }) {
+function Stat({
+  label,
+  value,
+  hint,
+  tooltip,
+}: {
+  label: string;
+  value: string;
+  hint?: string;
+  tooltip?: string;
+}) {
   return (
-    <div className="rounded-lg border border-border bg-card/60 p-3">
-      <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
-      <p className="tabular mt-1 text-sm text-foreground">{value}</p>
+    <div className="rounded-lg border border-border bg-card/60 p-3 hover-lift-subtle transition-all">
+      <div className="flex items-center justify-between">
+        <p className="text-[10px] uppercase tracking-widest text-muted-foreground">{label}</p>
+        {tooltip && (
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <button type="button" className="text-muted-foreground hover:text-foreground">
+                <Info className="h-3 w-3 opacity-60 hover:opacity-100" />
+              </button>
+            </TooltipTrigger>
+            <TooltipContent side="top" className="max-w-xs text-[11px]">
+              {tooltip}
+            </TooltipContent>
+          </Tooltip>
+        )}
+      </div>
+      <p className="tabular mt-1 text-sm font-semibold text-foreground">{value}</p>
       {hint ? <p className="mt-0.5 text-[10px] text-muted-foreground">{hint}</p> : null}
     </div>
   );
@@ -421,8 +449,12 @@ Generated via Crypto Compass Lab.`;
     <div className="space-y-4">
       <section
         className={cn(
-          "relative overflow-hidden rounded-xl border p-5",
-          isLong ? "border-bull/40" : isShort ? "border-bear/40" : "border-border",
+          "relative overflow-hidden rounded-xl border p-5 transition-all duration-300 hover-lift",
+          isLong
+            ? "border-bull/40 glow-bull"
+            : isShort
+              ? "border-bear/40 glow-bear"
+              : "border-border",
         )}
         style={{
           background:
@@ -431,63 +463,92 @@ Generated via Crypto Compass Lab.`;
       >
         <div className="flex flex-wrap items-start justify-between gap-4">
           <div>
-            <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground">
-              {result.symbol}/USDT · {result.timeframe} signal
-            </p>
-            <div className={cn("mt-1 flex items-center gap-2", dirColor)}>
-              <DirIcon className="h-7 w-7" strokeWidth={2.5} />
-              <h2 className="text-4xl font-bold">{result.direction}</h2>
+            <div className="flex items-center gap-2">
+              <p className="text-[10px] uppercase tracking-[0.2em] text-muted-foreground font-semibold">
+                {result.symbol}/USDT · {result.timeframe} Classic Confluence
+              </p>
+              <span className="relative flex h-2 w-2">
+                <span className="animate-ping absolute inline-flex h-full w-full rounded-full bg-primary opacity-75"></span>
+                <span className="relative inline-flex rounded-full h-2 w-2 bg-primary"></span>
+              </span>
+            </div>
+
+            <div className={cn("mt-1.5 flex items-center gap-2", dirColor)}>
+              <DirIcon className="h-8 w-8 animate-float" strokeWidth={2.5} />
+              <h2 className="text-4xl font-black tracking-tight">{result.direction}</h2>
             </div>
             <p className="mt-1 text-xs text-muted-foreground">
               Confluence:{" "}
-              <span className="font-semibold text-foreground">{result.confluenceScore}/100</span> ·
-              Confidence: <span className="font-semibold text-foreground">{result.confidence}</span>{" "}
+              <span className="font-bold text-foreground">{result.confluenceScore}/100</span> ·
+              Confidence: <span className="font-bold text-foreground">{result.confidence}</span>{" "}
               · R:R {result.riskReward.toFixed(2)} · {result.modelUsed}
             </p>
+
             <div className="mt-3 flex flex-wrap gap-2 items-center">
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                  result.marketRegime.includes("BULLISH")
-                    ? "border-bull/30 bg-bull/10 text-bull"
-                    : result.marketRegime.includes("BEARISH")
-                      ? "border-bear/30 bg-bear/10 text-bear"
-                      : "border-border bg-muted/20 text-muted-foreground",
-                )}
-              >
-                Regime: {result.marketRegime}
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider cursor-help transition-transform hover:scale-105",
+                      result.marketRegime.includes("BULLISH")
+                        ? "border-bull/30 bg-bull/10 text-bull"
+                        : result.marketRegime.includes("BEARISH")
+                          ? "border-bear/30 bg-bear/10 text-bear"
+                          : "border-border bg-muted/20 text-muted-foreground",
+                    )}
+                  >
+                    Regime: {result.marketRegime}
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  Market regime is calculated from multi-timeframe EMA cascades, ATR expansion, and BOS structure to gate counter-trend entries.
+                </TooltipContent>
+              </Tooltip>
 
               {/* Directional Edge Badge */}
-              <span
-                className={cn(
-                  "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold tracking-wider",
-                  isLong
-                    ? "border-bull/30 bg-bull/10 text-bull"
-                    : isShort
-                      ? "border-bear/30 bg-bear/10 text-bear"
-                      : "border-border bg-muted/20 text-muted-foreground",
-                )}
-              >
-                Edge: {result.directionalEdge > 0 ? `+${result.directionalEdge} pts` : "0 pts"} (L:{" "}
-                {result.longScore} | S: {result.shortScore})
-              </span>
+              <Tooltip>
+                <TooltipTrigger asChild>
+                  <span
+                    className={cn(
+                      "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold tracking-wider cursor-help transition-transform hover:scale-105",
+                      isLong
+                        ? "border-bull/30 bg-bull/10 text-bull"
+                        : isShort
+                          ? "border-bear/30 bg-bear/10 text-bear"
+                          : "border-border bg-muted/20 text-muted-foreground",
+                    )}
+                  >
+                    Edge: {result.directionalEdge > 0 ? `+${result.directionalEdge} pts` : "0 pts"} (L:{" "}
+                    {result.longScore} | S: {result.shortScore})
+                  </span>
+                </TooltipTrigger>
+                <TooltipContent side="top" className="max-w-xs text-xs">
+                  Directional edge is the point differential between Long Score and Short Score. Must exceed configured threshold to avoid choppy consolidations.
+                </TooltipContent>
+              </Tooltip>
 
               {result.sentiment ? (
-                <span
-                  className={cn(
-                    "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-semibold uppercase tracking-wider",
-                    result.sentiment.value >= 75
-                      ? "border-bull/45 bg-bull/15 text-bull"
-                      : result.sentiment.value >= 55
-                        ? "border-primary/40 bg-primary/10 text-primary"
-                        : result.sentiment.value <= 25
-                          ? "border-bear/45 bg-bear/15 text-bear"
-                          : "border-border bg-muted/20 text-muted-foreground",
-                  )}
-                >
-                  Sentiment: {result.sentiment.value} ({result.sentiment.label})
-                </span>
+                <Tooltip>
+                  <TooltipTrigger asChild>
+                    <span
+                      className={cn(
+                        "inline-flex items-center gap-1 rounded-md border px-2 py-0.5 text-[10px] font-bold uppercase tracking-wider cursor-help transition-transform hover:scale-105",
+                        result.sentiment.value >= 75
+                          ? "border-bull/45 bg-bull/15 text-bull"
+                          : result.sentiment.value >= 55
+                            ? "border-primary/40 bg-primary/10 text-primary"
+                            : result.sentiment.value <= 25
+                              ? "border-bear/45 bg-bear/15 text-bear"
+                              : "border-border bg-muted/20 text-muted-foreground",
+                      )}
+                    >
+                      Sentiment: {result.sentiment.value} ({result.sentiment.label})
+                    </span>
+                  </TooltipTrigger>
+                  <TooltipContent side="top" className="max-w-xs text-xs">
+                    Crypto Fear & Greed Index from Alternative.me tracking systemic market sentiment.
+                  </TooltipContent>
+                </Tooltip>
               ) : null}
             </div>
           </div>
@@ -497,12 +558,12 @@ Generated via Crypto Compass Lab.`;
               <p className="text-[10px] uppercase tracking-widest text-muted-foreground">
                 Current price
               </p>
-              <p className="tabular text-2xl font-semibold text-foreground">
+              <p className="tabular text-2xl font-bold text-foreground">
                 ${fmtPrice(result.currentPrice)}
               </p>
               <p
                 className={cn(
-                  "tabular text-xs",
+                  "tabular text-xs font-semibold",
                   result.change24hPct >= 0 ? "text-bull" : "text-bear",
                 )}
               >
@@ -513,7 +574,7 @@ Generated via Crypto Compass Lab.`;
               variant="outline"
               size="sm"
               onClick={handleShare}
-              className="h-9 gap-1.5 border-border bg-background/50 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground self-center"
+              className="h-9 gap-1.5 border-border bg-background/50 px-3 text-[10px] font-semibold uppercase tracking-wider text-muted-foreground hover:bg-accent hover:text-foreground self-center transition-all hover:scale-105 active:scale-95"
             >
               <Share2 className="h-3.5 w-3.5" /> Share
             </Button>
@@ -522,61 +583,82 @@ Generated via Crypto Compass Lab.`;
 
         {/* Confluence Metrics Grid */}
         <div className="mt-5 grid grid-cols-3 gap-3">
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-              Long Score
-            </span>
-            <span className="text-base font-bold block text-bull mt-0.5">
-              {result.longScore}/100
-            </span>
-            <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-bull rounded-full"
-                style={{ width: `${result.longScore}%` }}
-              />
-            </div>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center cursor-help hover-lift-subtle transition-all">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                  Long Score
+                </span>
+                <span className="text-base font-bold block text-bull mt-0.5">
+                  {result.longScore}/100
+                </span>
+                <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-bull rounded-full transition-all duration-700"
+                    style={{ width: `${result.longScore}%` }}
+                  />
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Independent bullish confluence score calculated from HTF bias, support zones, sweep rejections, and momentum.
+            </TooltipContent>
+          </Tooltip>
 
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-              Short Score
-            </span>
-            <span className="text-base font-bold block text-bear mt-0.5">
-              {result.shortScore}/100
-            </span>
-            <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className="h-full bg-bear rounded-full"
-                style={{ width: `${result.shortScore}%` }}
-              />
-            </div>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center cursor-help hover-lift-subtle transition-all">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                  Short Score
+                </span>
+                <span className="text-base font-bold block text-bear mt-0.5">
+                  {result.shortScore}/100
+                </span>
+                <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className="h-full bg-bear rounded-full transition-all duration-700"
+                    style={{ width: `${result.shortScore}%` }}
+                  />
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Independent bearish confluence score calculated from HTF trend headwinds, supply zones, liquidity raids, and momentum breakdown.
+            </TooltipContent>
+          </Tooltip>
 
-          <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center">
-            <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-              Confluence
-            </span>
-            <span
-              className={cn(
-                "text-base font-bold block mt-0.5",
-                isLong ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground",
-              )}
-            >
-              {result.confluenceScore}/100 ({result.confidence})
-            </span>
-            <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
-              <div
-                className={cn(
-                  "h-full rounded-full",
-                  isLong ? "bg-bull" : isShort ? "bg-bear" : "bg-muted-foreground",
-                )}
-                style={{ width: `${result.confluenceScore}%` }}
-              />
-            </div>
-          </div>
+          <Tooltip>
+            <TooltipTrigger asChild>
+              <div className="rounded-lg border border-border/40 bg-background/40 p-2.5 text-center cursor-help hover-lift-subtle transition-all">
+                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                  Confluence
+                </span>
+                <span
+                  className={cn(
+                    "text-base font-bold block mt-0.5",
+                    isLong ? "text-bull" : isShort ? "text-bear" : "text-muted-foreground",
+                  )}
+                >
+                  {result.confluenceScore}/100 ({result.confidence})
+                </span>
+                <div className="mt-1.5 h-1 w-full bg-muted rounded-full overflow-hidden">
+                  <div
+                    className={cn(
+                      "h-full rounded-full transition-all duration-700",
+                      isLong ? "bg-bull" : isShort ? "bg-bear" : "bg-muted-foreground",
+                    )}
+                    style={{ width: `${result.confluenceScore}%` }}
+                  />
+                </div>
+              </div>
+            </TooltipTrigger>
+            <TooltipContent side="bottom" className="text-xs">
+              Winning setup confluence score reflecting weighted indicator and structural alignment.
+            </TooltipContent>
+          </Tooltip>
         </div>
 
-        <p className="mt-4 text-sm leading-relaxed text-foreground/90">{result.summary}</p>
+        <p className="mt-4 text-sm leading-relaxed text-foreground/90 font-medium">{result.summary}</p>
       </section>
 
       {isNoTrade ? (
@@ -641,128 +723,177 @@ Generated via Crypto Compass Lab.`;
         <div className="space-y-4">
           {/* Multi-Timeframe Confirmation Checklist */}
           <div className="grid gap-3 sm:grid-cols-2 md:grid-cols-3">
-            <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between">
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-                  Volume Expansion
-                </span>
-                <span className="text-xs text-foreground font-semibold">
-                  RVOL ({result.indicators.volumeRatio}x)
-                </span>
-              </div>
-              {result.indicators.volumeRatio >= 1.2 ? (
-                <CheckCircle2 className="h-5 w-5 text-bull" />
-              ) : (
-                <XCircle className="h-5 w-5 text-muted-foreground/45" />
-              )}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between hover-lift-subtle transition-all cursor-help">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                      Volume Expansion
+                    </span>
+                    <span className="text-xs text-foreground font-bold">
+                      RVOL ({result.indicators.volumeRatio}x)
+                    </span>
+                  </div>
+                  {result.indicators.volumeRatio >= 1.2 ? (
+                    <CheckCircle2 className="h-5 w-5 text-bull" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground/45" />
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Relative Volume (RVOL) compared to 20-period moving average. Values &ge; 1.2x confirm institutional participation.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between">
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-                  Momentum Alignment
-                </span>
-                <span className="text-xs text-foreground font-semibold">
-                  RSI ({result.indicators.rsi}) & MACD
-                </span>
-              </div>
-              {result.indicators.rsi >= 40 && result.indicators.rsi <= 68 ? (
-                <CheckCircle2 className="h-5 w-5 text-bull" />
-              ) : (
-                <XCircle className="h-5 w-5 text-muted-foreground/45" />
-              )}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between hover-lift-subtle transition-all cursor-help">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                      Momentum Alignment
+                    </span>
+                    <span className="text-xs text-foreground font-bold">
+                      RSI ({result.indicators.rsi}) & MACD
+                    </span>
+                  </div>
+                  {result.indicators.rsi >= 40 && result.indicators.rsi <= 68 ? (
+                    <CheckCircle2 className="h-5 w-5 text-bull" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground/45" />
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                RSI and MACD histogram momentum alignment to verify non-exhaustion entry conditions.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between">
-              <div>
-                <span className="text-[9px] uppercase tracking-wider text-muted-foreground block">
-                  Structure Confirmation
-                </span>
-                <span className="text-xs text-foreground font-semibold">BOS / CHoCH Break</span>
-              </div>
-              {result.reasoning.some((r) => r.label.includes("Structure")) ? (
-                <CheckCircle2 className="h-5 w-5 text-bull" />
-              ) : (
-                <XCircle className="h-5 w-5 text-muted-foreground/45" />
-              )}
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-lg border border-border bg-card/40 p-3 flex items-center justify-between hover-lift-subtle transition-all cursor-help">
+                  <div>
+                    <span className="text-[9px] uppercase tracking-wider text-muted-foreground block font-semibold">
+                      Structure Confirmation
+                    </span>
+                    <span className="text-xs text-foreground font-bold">BOS / CHoCH Break</span>
+                  </div>
+                  {result.reasoning.some((r) => r.label.includes("Structure")) ? (
+                    <CheckCircle2 className="h-5 w-5 text-bull" />
+                  ) : (
+                    <XCircle className="h-5 w-5 text-muted-foreground/45" />
+                  )}
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="text-xs">
+                Break of Structure (BOS) or Change of Character (CHoCH) on closed setup timeframe candles.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           {/* Trade Levels Cards with Entry Models */}
           <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-            <div className="rounded-xl border border-border bg-card/60 p-4">
-              <div className="flex items-center justify-between text-muted-foreground">
-                <div className="flex items-center gap-1.5">
-                  <Crosshair className="h-4 w-4 text-primary" />
-                  <span className="text-[10px] uppercase tracking-widest font-semibold">Entry</span>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-border bg-card/60 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center justify-between text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                      <Crosshair className="h-4 w-4 text-primary" />
+                      <span className="text-[10px] uppercase tracking-widest font-bold">Entry</span>
+                    </div>
+                    {result.entryType && (
+                      <span className="text-[9px] font-black uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
+                        {result.entryType}
+                      </span>
+                    )}
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-foreground">
+                    ${fmtPrice(result.entry)}
+                  </p>
+                  {result.entryZone && (
+                    <p className="tabular mt-0.5 text-[10px] text-muted-foreground font-mono">
+                      Zone: ${fmtPrice(result.entryZone.min)} - ${fmtPrice(result.entryZone.max)}
+                    </p>
+                  )}
+                  {result.triggerCondition && (
+                    <p className="mt-1 text-[9px] text-muted-foreground/90 line-clamp-2">
+                      {result.triggerCondition}
+                    </p>
+                  )}
                 </div>
-                {result.entryType && (
-                  <span className="text-[9px] font-bold uppercase tracking-wider px-1.5 py-0.5 rounded bg-primary/10 text-primary border border-primary/20">
-                    {result.entryType}
-                  </span>
-                )}
-              </div>
-              <p className="tabular mt-2 text-xl font-bold text-foreground">
-                ${fmtPrice(result.entry)}
-              </p>
-              {result.entryZone && (
-                <p className="tabular mt-0.5 text-[10px] text-muted-foreground font-mono">
-                  Zone: ${fmtPrice(result.entryZone.min)} - ${fmtPrice(result.entryZone.max)}
-                </p>
-              )}
-              {result.triggerCondition && (
-                <p className="mt-1 text-[9px] text-muted-foreground/90 line-clamp-2">
-                  {result.triggerCondition}
-                </p>
-              )}
-            </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Exact execution model: Limit orders inside Order Blocks/FVGs, or Market orders on confirmed sweep closes.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-xl border border-bear/40 bg-bear/5 p-4">
-              <div className="flex items-center gap-2 text-bear">
-                <ShieldAlert className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest font-semibold">
-                  Stop Loss
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-bold text-bear">
-                ${fmtPrice(result.stopLoss)}
-              </p>
-              <p className="tabular mt-1 text-[10px] text-muted-foreground">
-                Risk: {priceRiskPct.toFixed(2)}%
-              </p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-bear/40 bg-bear/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center gap-2 text-bear">
+                    <ShieldAlert className="h-4 w-4" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">
+                      Stop Loss
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-bear">
+                    ${fmtPrice(result.stopLoss)}
+                  </p>
+                  <p className="tabular mt-1 text-[10px] text-muted-foreground">
+                    Risk: {priceRiskPct.toFixed(2)}% (Protected Swing)
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Anchored behind the structural swing origin that caused the market structure shift plus dynamic ATR buffer.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-xl border border-bull/40 bg-bull/5 p-4">
-              <div className="flex items-center gap-2 text-bull">
-                <Target className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest font-semibold">
-                  Target 1
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-bold text-bull">
-                ${fmtPrice(result.target1)}
-              </p>
-              <p className="tabular mt-1 text-[10px] text-muted-foreground">
-                Reward: +
-                {((Math.abs(result.target1 - result.entry) / (result.entry || 1)) * 100).toFixed(2)}
-                %
-              </p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-bull/40 bg-bull/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center gap-2 text-bull">
+                    <Target className="h-4 w-4" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">
+                      Target 1 (De-Risk)
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-bull">
+                    ${fmtPrice(result.target1)}
+                  </p>
+                  <p className="tabular mt-1 text-[10px] text-muted-foreground">
+                    Reward: +
+                    {((Math.abs(result.target1 - result.entry) / (result.entry || 1)) * 100).toFixed(2)}
+                    % (Take 40% & Move to BE)
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Nearest opposing internal liquidity pool. Take partials here and move stop loss to break-even.
+              </TooltipContent>
+            </Tooltip>
 
-            <div className="rounded-xl border border-bull/40 bg-bull/5 p-4">
-              <div className="flex items-center gap-2 text-bull">
-                <Target className="h-4 w-4" />
-                <span className="text-[10px] uppercase tracking-widest font-semibold">
-                  Target 2 / 3
-                </span>
-              </div>
-              <p className="tabular mt-2 text-xl font-bold text-bull">
-                ${fmtPrice(result.target2)} {result.target3 ? `· $${fmtPrice(result.target3)}` : ""}
-              </p>
-              <p className="tabular mt-1 text-[10px] text-muted-foreground">
-                R:R: {result.riskReward.toFixed(2)}R
-              </p>
-            </div>
+            <Tooltip>
+              <TooltipTrigger asChild>
+                <div className="rounded-xl border border-bull/40 bg-bull/5 p-4 hover-lift transition-all cursor-help">
+                  <div className="flex items-center gap-2 text-bull">
+                    <Target className="h-4 w-4" />
+                    <span className="text-[10px] uppercase tracking-widest font-bold">
+                      Target 2 / 3
+                    </span>
+                  </div>
+                  <p className="tabular mt-2 text-xl font-black text-bull">
+                    ${fmtPrice(result.target2)} {result.target3 ? `· $${fmtPrice(result.target3)}` : ""}
+                  </p>
+                  <p className="tabular mt-1 text-[10px] text-muted-foreground">
+                    R:R: {result.riskReward.toFixed(2)}R Net
+                  </p>
+                </div>
+              </TooltipTrigger>
+              <TooltipContent side="top" className="max-w-xs text-xs">
+                Major opposing structural liquidity pool (PDH/PDL or Supply/Demand) giving asymmetric risk-to-reward.
+              </TooltipContent>
+            </Tooltip>
           </div>
 
           <TradeCalculator
@@ -806,19 +937,34 @@ Generated via Crypto Compass Lab.`;
                   ? "Oversold"
                   : "Neutral"
             }
+            tooltip="14-period Relative Strength Index measuring speed and magnitude of price changes."
           />
-          <Stat label="EMA 20" value={`$${fmtPrice(result.indicators.ema20)}`} />
-          <Stat label="EMA 50" value={`$${fmtPrice(result.indicators.ema50)}`} />
-          <Stat label="EMA 200" value={`$${fmtPrice(result.indicators.ema200)}`} />
+          <Stat
+            label="EMA 20"
+            value={`$${fmtPrice(result.indicators.ema20)}`}
+            tooltip="20-period Exponential Moving Average for short-term dynamic momentum."
+          />
+          <Stat
+            label="EMA 50"
+            value={`$${fmtPrice(result.indicators.ema50)}`}
+            tooltip="50-period Exponential Moving Average for intermediate trend direction."
+          />
+          <Stat
+            label="EMA 200"
+            value={`$${fmtPrice(result.indicators.ema200)}`}
+            tooltip="200-period Exponential Moving Average representing macro institutional baseline."
+          />
           <Stat
             label="ATR"
             value={`$${fmtPrice(result.indicators.atr)}`}
             hint={`${result.indicators.atrPct}% of price`}
+            tooltip="Average True Range measuring price volatility to calibrate stop loss buffers."
           />
           <Stat
             label="Volume"
             value={result.indicators.volumeLabel}
             hint={`${result.indicators.volumeRatio}x 20-SMA`}
+            tooltip="Volume compared to 20-period moving average to verify institutional follow-through."
           />
         </div>
       </section>
